@@ -6,6 +6,8 @@
 //    genericQuery do Protheus direto. Exige CORS liberado no REST do Protheus.
 (() => {
   const CHAVE_URL = 'romaneio.protheusUrl';
+  // Endereço usado quando a pessoa ainda não informou outro (já vem preenchido na tela de login)
+  const URL_PADRAO = 'https://protheus.quatroktextil.com.br:6632/rest05/api/framework/v1/genericQuery';
   const CHAVE_AUTH = 'romaneio.auth';
   const CFG = {
     tabela: 'SZ5', campoFilial: 'Z5_FILIAL', campoRomaneio: 'Z5_ROMAN', campoProduto: 'Z5_PROD',
@@ -96,7 +98,7 @@
   // Mesma regra do server.js
   async function consultarDireto(numero, filial) {
     const a = auth();
-    const base = normalizarUrl(ler(localStorage, CHAVE_URL));
+    const base = normalizarUrl((ler(localStorage, CHAVE_URL) || URL_PADRAO));
     if (!a || !base) throw new ErroAPI('Entre com seu usuário do Protheus.', 401, true);
     numero = texto(numero).toUpperCase();
     filial = texto(filial);
@@ -162,7 +164,7 @@
 
   window.API = {
     get modo() { return modo; },
-    servidorSalvo: () => ler(localStorage, CHAVE_URL) || '',
+    servidorSalvo: () => ler(localStorage, CHAVE_URL) || URL_PADRAO,
 
     async status() {
       if ((await detectarModo()) === 'servidor') {
@@ -170,7 +172,7 @@
         return r.json();
       }
       const a = auth();
-      const url = ler(localStorage, CHAVE_URL);
+      const url = (ler(localStorage, CHAVE_URL) || URL_PADRAO);
       return { ok: true, direto: true, configurado: true, servidor: url || '', logado: !!(a && url), usuario: a ? a.usuario : '' };
     },
 
