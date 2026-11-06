@@ -234,7 +234,7 @@
     mostrar('loginErro', msg || '');
     try { $('loginUsuario').value ||= localStorage.getItem(CHAVE_USER) || ''; } catch {}
     const direto = API.modo === 'direto';
-    $('loginServidorBox').hidden = !direto;
+    $('loginServidorBox').hidden = true; // endereço do Protheus fica oculto (vem preenchido)
     $('lembrarBox').hidden = !direto;
     if (direto) $('loginServidor').value ||= API.servidorSalvo();
     (direto && !$('loginServidor').value ? $('loginServidor') : $('loginUsuario').value ? $('loginSenha') : $('loginUsuario')).focus();

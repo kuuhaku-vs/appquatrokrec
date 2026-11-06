@@ -40,12 +40,10 @@
   }
 
   const origem = location.origin;
-  function msgConexao(url) {
-    let host = url;
-    try { host = new URL(url).origin; } catch {}
-    return `O navegador não conseguiu falar com o Protheus (${host}). Os motivos mais comuns:\n` +
-      `• O CORS não está liberado no REST do Protheus. Peça à TI para colocar no appserver.ini, na seção [HTTPURI] do REST: CORSEnable=1 e AllowOrigin=${origem}\n` +
-      `• O certificado do servidor não é confiável: abra ${host} numa aba nova, aceite o aviso de segurança e tente de novo.\n` +
+  function msgConexao() {
+    return `O navegador não conseguiu falar com o Protheus. Os motivos mais comuns:\n` +
+      `• O CORS não está liberado no REST do Protheus (a TI precisa liberar ${origem} no appserver.ini).\n` +
+      `• O certificado do servidor do Protheus não é confiável neste computador.\n` +
       `• Este computador não alcança o servidor (rede/VPN).`;
   }
 
