@@ -95,6 +95,35 @@ button, input { font: inherit; color: inherit; }
   .btn-buscar { justify-content: center; }
 }
 
+/* ---------- Usuário logado ---------- */
+.topo-in { position: relative; }
+.usuario { position: absolute; top: 18px; right: max(20px, env(safe-area-inset-right, 0px)); display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--band-muted); }
+.usuario-nome { display: inline-flex; align-items: center; gap: 6px; color: var(--band-fg); font-weight: 600; }
+.usuario-nome svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; }
+.usuario button { border: 1px solid var(--band-line); background: transparent; color: var(--band-fg); border-radius: 6px; padding: 4px 10px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.usuario button:hover { background: var(--band-input); }
+body.logado .topo-in { padding-top: 52px; }
+body:not(.logado) .busca, body:not(.logado) .recentes { display: none !important; }
+@media (max-width: 520px) { .usuario { top: 12px; } }
+
+/* ---------- Login ---------- */
+.login { display: grid; place-items: center; padding-block: 24px 40px; }
+.login-card { width: min(100%, 400px); background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 28px; display: grid; gap: 14px; box-shadow: var(--sombra); }
+.login-ico { width: 44px; height: 44px; color: var(--accent); }
+.login-card h1 { margin: 0; font: 700 26px/1.1 var(--display); font-stretch: 85%; }
+.login-card > p { margin: -6px 0 0; color: var(--muted); font-size: 14px; }
+.login-campo { display: grid; gap: 5px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.login-campo input { width: 100%; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); border-radius: 8px; padding: 11px 12px; font: 16px var(--body); text-transform: none; letter-spacing: 0; }
+.login-campo input:focus { outline: none; border-color: var(--accent); background: var(--surface); }
+.senha-wrap { position: relative; display: block; }
+.senha-wrap input { padding-right: 84px; }
+.senha-wrap button { position: absolute; right: 6px; top: 50%; translate: 0 -50%; border: 0; background: transparent; color: var(--accent); font: 600 12px var(--body); cursor: pointer; padding: 6px 8px; text-transform: none; letter-spacing: 0; }
+.login-campo small { font-size: 11.5px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--muted); }
+.alerta { white-space: pre-line; }
+.btn-entrar { height: 46px; border: 0; border-radius: 8px; background: var(--accent); color: var(--accent-fg); font-weight: 700; font-size: 15px; cursor: pointer; }
+.btn-entrar:disabled { opacity: .7; cursor: progress; }
+.login-nota { margin: 0; font-size: 12px; color: var(--muted); }
+
 /* ---------- Conteúdo ---------- */
 .conteudo { flex: 1; padding-block: 28px 48px; display: grid; gap: 20px; align-content: start; }
 .rotulo { font-size: 11px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
@@ -268,7 +297,7 @@ td.n:has(input.ed) { padding-block: 5px; }
 @media print {
   :root { --bg: #fff; --surface: #fff; --surface-2: #f2f2f2; --fg: #000; --muted: #444; --line: #ccc; --accent: #000; --accent-fg: #fff; --accent-soft: #fff; color-scheme: light; }
   body { font-size: 11px; }
-  .topo, .barra-ferr, .rodape-site, .toast, .alerta-aviso, .col-seta, tr.prod .seta, .conf-zona, .conf-img { display: none !important; }
+  .topo, .barra-ferr, .rodape-site, .usuario, .toast, .alerta-aviso, .col-seta, tr.prod .seta, .conf-zona, .conf-img { display: none !important; }
   .conf-layout.com-img.lado { grid-template-columns: 1fr; }
   input.ed { border: 0; background: none; width: auto; }
   .conteudo { padding: 0; max-width: none; }

@@ -4,12 +4,15 @@
 // problema de CORS e o usuário/senha ficam só aqui no servidor.
 //
 // Uso:  node server.js   (Node 18 ou superior, nenhum pacote para instalar)
-// Configuração: arquivo .env na mesma pasta (veja .env.exemplo)
+// Configuração: arquivo .env na mesma pasta (veja .env.exemplo).
+// O login é feito na tela do site, com o usuário do Protheus de cada pessoa.
 
 const http = require('http');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+const { AsyncLocalStorage } = require('async_hooks');
 
 // ---------- Lê o arquivo .env (sem dependências) ----------
 (function carregarEnv() {
@@ -28,9 +31,9 @@ const env = (k, padrao) => (process.env[k] !== undefined && process.env[k] !== '
 
 const CONFIG = {
   porta: Number(env('PORT', 3000)),
-  urlGenericQuery: env('PROTHEUS_URL', 'https://protheus.quatroktextil.com.br:6632/rest05/api/framework/v1/genericQuery'),
-  usuario: env('PROTHEUS_USER', ''),
-  senha: env('PROTHEUS_PASS', ''),
+  // Endereço da genericQuery, ex.: https://SEU-SERVIDOR:PORTA/rest/api/framework/v1/genericQuery
+  urlGenericQuery: env('PROTHEUS_URL', ''),
+  horasSessao: Number(env('HORAS_SESSAO', 10)),
   ignorarSSL: env('PROTHEUS_IGNORE_SSL', '1') !== '0',
   // Campos da SZ5 (confirmados no dicionário SX3)
   tabela: 'SZ5',
@@ -50,11 +53,43 @@ const PUBLICO = path.join(__dirname, 'public');
 const TIPOS = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json; charset=utf-8',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
 };
+
+// ---------- Sessões (login feito na tela do site) ----------
+// Cada pessoa entra com o próprio usuário do Protheus. A senha fica só na memória
+// deste servidor enquanto a sessão estiver aberta; nada é gravado em disco.
+const sessoes = new Map(); // token -> { usuario, senha, expira }
+const credencial = new AsyncLocalStorage();
+const duracao = () => CONFIG.horasSessao * 3600 * 1000;
+function lerCookie(req, nome) {
+  for (const p of (req.headers.cookie || '').split(';')) {
+    const [k, ...v] = p.trim().split('=');
+    if (k === nome) return decodeURIComponent(v.join('='));
+  }
+  return '';
+}
+function sessaoDe(req) {
+  const t = lerCookie(req, 'sessao');
+  const s = t && sessoes.get(t);
+  if (!s) return null;
+  if (s.expira < Date.now()) { sessoes.delete(t); return null; }
+  s.expira = Date.now() + duracao();
+  return { token: t, ...s };
+}
+setInterval(() => { const a = Date.now(); for (const [t, s] of sessoes) if (s.expira < a) sessoes.delete(t); }, 600000).unref();
+
+function lerCorpo(req) {
+  return new Promise((ok, falha) => {
+    let d = '';
+    req.on('data', (c) => { d += c; if (d.length > 10000) { falha(new Error('Requisição grande demais.')); req.destroy(); } });
+    req.on('end', () => { try { ok(d ? JSON.parse(d) : {}); } catch { falha(new Error('JSON inválido.')); } });
+  });
+}
 
 // ---------- Protheus ----------
 class ErroProtheus extends Error {
-  constructor(msg, url) { super(msg); this.url = url; }
+  constructor(msg, url, status) { super(msg); this.url = url; this.status = status; }
 }
 
 function chamarProtheus(url) {
@@ -64,7 +99,7 @@ function chamarProtheus(url) {
     const req = lib.request(u, {
       method: 'GET',
       headers: {
-        Authorization: 'Basic ' + Buffer.from(`${CONFIG.usuario}:${CONFIG.senha}`).toString('base64'),
+        Authorization: 'Basic ' + Buffer.from(`${(credencial.getStore() || {}).usuario || ''}:${(credencial.getStore() || {}).senha || ''}`).toString('base64'),
         Accept: 'application/json',
       },
       rejectUnauthorized: !CONFIG.ignorarSSL,
@@ -92,7 +127,7 @@ async function buscarTudo(tabela, campos, where) {
     const { status, corpo } = await chamarProtheus(url);
     let dados = null;
     try { dados = JSON.parse(corpo); } catch {}
-    if (status === 401) throw new ErroProtheus('O Protheus recusou o usuário ou a senha. Confira PROTHEUS_USER e PROTHEUS_PASS no arquivo .env.', primeiraUrl);
+    if (status === 401) throw new ErroProtheus('O Protheus recusou o usuário ou a senha.', primeiraUrl, 401);
     if (status < 200 || status >= 300) {
       const msg = (dados && (dados.message || dados.errorMessage || dados.detailedMessage)) || corpo.slice(0, 400);
       throw new ErroProtheus(`O Protheus respondeu ${status} na consulta da ${tabela}: ${msg}`, primeiraUrl);
@@ -223,21 +258,74 @@ function arquivoEstatico(res, caminho) {
   });
 }
 
+// Testa usuário e senha com uma consulta mínima no Protheus
+async function validarLogin(usuario, senha) {
+  const qs = new URLSearchParams({ tables: 'SB1', fields: 'B1_COD', where: "B1_COD='__LOGIN__'", page: '1', pagesize: '1' });
+  const { status } = await credencial.run({ usuario, senha }, () => chamarProtheus(`${CONFIG.urlGenericQuery}?${qs}`));
+  return status;
+}
+
+function cookieSessao(token, maxAge) {
+  return `sessao=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}`;
+}
+
 const servidor = http.createServer(async (req, res) => {
   const u = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   try {
-    if (u.pathname === '/api/romaneio') {
-      const { status, dados } = await consultarRomaneio(u.searchParams);
-      return json(res, status, dados);
+    if (u.pathname === '/api/status') {
+      const s = sessaoDe(req);
+      return json(res, 200, { ok: true, configurado: !!CONFIG.urlGenericQuery, logado: !!s, usuario: s ? s.usuario : '' });
     }
-    if (u.pathname === '/api/campos') return json(res, 200, await listarCampos());
-    if (u.pathname === '/api/status') return json(res, 200, { ok: true, configurado: !!(CONFIG.usuario && CONFIG.senha) });
+
+    if (u.pathname === '/api/login' && req.method === 'POST') {
+      if (!CONFIG.urlGenericQuery) return json(res, 500, { erro: 'O endereço do Protheus não foi configurado. Preencha PROTHEUS_URL no arquivo .env e reinicie.' });
+      const { usuario, senha } = await lerCorpo(req);
+      const user = String(usuario || '').trim();
+      if (!user || !senha) return json(res, 400, { erro: 'Informe usuário e senha.' });
+      const status = await validarLogin(user, String(senha));
+      if (status === 401 || status === 403) {
+        await new Promise((r) => setTimeout(r, 800)); // freia tentativas repetidas
+        return json(res, 401, { erro: 'Usuário ou senha incorretos.' });
+      }
+      if (status < 200 || status >= 300) return json(res, 502, { erro: `O Protheus respondeu ${status} ao validar o login. Tente de novo em instantes.` });
+      const token = crypto.randomBytes(32).toString('hex');
+      sessoes.set(token, { usuario: user, senha: String(senha), expira: Date.now() + duracao() });
+      res.setHeader('Set-Cookie', cookieSessao(token, Math.round(duracao() / 1000)));
+      console.log(new Date().toLocaleString('pt-BR'), `login: ${user}`);
+      return json(res, 200, { ok: true, usuario: user });
+    }
+
+    if (u.pathname === '/api/logout' && req.method === 'POST') {
+      const s = sessaoDe(req);
+      if (s) sessoes.delete(s.token);
+      res.setHeader('Set-Cookie', cookieSessao('', 0));
+      return json(res, 200, { ok: true });
+    }
+
+    if (u.pathname.startsWith('/api/')) {
+      const s = sessaoDe(req);
+      if (!s) return json(res, 401, { erro: 'Sua sessão expirou. Entre de novo.', login: true });
+      const cred = { usuario: s.usuario, senha: s.senha };
+      try {
+        if (u.pathname === '/api/romaneio') {
+          const { status, dados } = await credencial.run(cred, () => consultarRomaneio(u.searchParams));
+          return json(res, status, dados);
+        }
+        if (u.pathname === '/api/campos') return json(res, 200, await credencial.run(cred, listarCampos));
+      } catch (e) {
+        if (e instanceof ErroProtheus && e.status === 401) {
+          sessoes.delete(s.token);
+          return json(res, 401, { erro: 'O Protheus recusou seu usuário (senha alterada ou bloqueada). Entre de novo.', login: true });
+        }
+        throw e;
+      }
+      return json(res, 404, { erro: 'Rota não encontrada.' });
+    }
   } catch (e) {
     const msg = e instanceof ErroProtheus ? e.message : `Não foi possível conectar ao Protheus (${e.code || e.message}). Verifique a rede e o endereço em PROTHEUS_URL.`;
     console.error(new Date().toLocaleString('pt-BR'), msg);
     return json(res, 502, { erro: msg });
   }
-  if (u.pathname.startsWith('/api/')) return json(res, 404, { erro: 'Rota não encontrada.' });
   arquivoEstatico(res, u.pathname);
 });
 
@@ -248,10 +336,10 @@ servidor.listen(CONFIG.porta, '0.0.0.0', () => {
   for (const lista of Object.values(require('os').networkInterfaces())) {
     for (const i of lista || []) if (i.family === 'IPv4' && !i.internal) console.log(`  Na rede:           http://${i.address}:${CONFIG.porta}`);
   }
-  if (!CONFIG.usuario || !CONFIG.senha) {
+  if (!CONFIG.urlGenericQuery) {
     console.log('');
-    console.log('  ATENÇÃO: usuário e senha do Protheus não configurados.');
-    console.log('  Copie .env.exemplo para .env e preencha PROTHEUS_USER e PROTHEUS_PASS.');
+    console.log('  ATENÇÃO: endereço do Protheus não configurado.');
+    console.log('  Abra o arquivo .env e preencha PROTHEUS_URL (veja .env.exemplo).');
   }
   console.log('');
 });

@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-title Consulta de Romaneio
+title Consulta de Romaneio (servidor)
 cd /d "%~dp0"
 
 where node >nul 2>nul
@@ -16,7 +16,7 @@ if errorlevel 1 (
 if not exist ".env" (
   copy ".env.exemplo" ".env" >nul
   echo.
-  echo   Criei o arquivo .env. Preencha usuario e senha do Protheus nele.
+  echo   Criei o arquivo .env. Preencha PROTHEUS_URL com o endereco da genericQuery.
   echo.
   notepad ".env"
 )

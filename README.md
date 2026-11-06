@@ -1,29 +1,95 @@
 # Consulta de Romaneio
 
-Site interno para consultar um romaneio no Protheus. Digite o número e ele mostra:
+App interno para consultar romaneios no Protheus (TOTVS) e conferir com o packing list.
 
-- cada **produto** do romaneio (código e descrição);
-- a **quantidade de rolos** de cada produto;
-- a **quantidade atual em kg** (`Z5_PESOATU`) de cada produto e o total;
-- ao clicar num produto, a **lista de rolos** dele (número, série, OP, partida e quantidade).
+- Digite o número do romaneio e veja cada **produto** com a **quantidade de rolos** e a
+  **quantidade atual em kg** (`Z5_PESOATU`), com os totais. Clique num produto para ver os rolos
+  um a um (número, série, OP, partida e quantidade).
+- **Conferência com packing list**: envie o PDF, o print, a imagem ou a planilha do cliente e o app compara,
+  produto a produto, os rolos e o **TOTAL N.W.** com o sistema, mostrando a divergência em kg.
+- Login com o **usuário e senha do Protheus** de cada pessoa, na própria tela do app.
+- Funciona de dois jeitos: **pelo site** (GitHub Pages, sem instalar nada) ou com **servidor próprio** (atalho na área de trabalho).
+- Abre como **aplicativo** pelo atalho na área de trabalho.
 
-Também dá para filtrar, ordenar as colunas, copiar para o Excel, baixar CSV e imprimir.
+## Usar pelo site (GitHub Pages)
+
+Endereço: **https://kuuhaku-vs.github.io/appquatrokrec/**
+
+1. Abra o endereço no Edge ou no Chrome.
+2. Na tela de login, informe o **endereço do Protheus** (o mesmo da genericQuery usado no Postman;
+   fica salvo no navegador), seu **usuário** e **senha** do Protheus.
+3. Para virar app: clique em **Instalar app** no topo (ou no ícone de instalar da barra de endereço).
+   Ele ganha atalho na área de trabalho e no menu Iniciar.
+
+Nesse modo não existe servidor no meio: o navegador consulta o Protheus direto. Para isso a TI
+precisa **liberar o CORS** no REST do Protheus, no `appserver.ini`, seção `[HTTPURI]` do REST
+([documentação TOTVS](https://tdn.totvs.com/x/i7PbCw)):
+
+```ini
+[HTTPURI]
+CORSEnable=1
+AllowOrigin=https://kuuhaku-vs.github.io
+```
+
+Depois de alterar, reinicie o serviço do REST. Também é preciso que:
+
+- o certificado HTTPS do Protheus seja válido (se for interno/autoassinado, abra o endereço do
+  Protheus numa aba e aceite o aviso antes de entrar);
+- o computador alcance o endereço do Protheus (rede da empresa, VPN ou acesso externo liberado).
+
+A senha fica só na aba aberta (some ao fechar), a não ser que a pessoa marque
+"Continuar conectado neste computador".
+
+Se o CORS não puder ser liberado, use o modo com servidor abaixo.
+
+## Instalar com servidor próprio (Windows)
+
+1. Instale o **Node.js** (versão LTS): https://nodejs.org
+2. Baixe este projeto (botão **Code → Download ZIP** no GitHub) e descompacte numa pasta fixa,
+   por exemplo `C:\ConsultaRomaneio`.
+3. Copie `.env.exemplo` para `.env` e preencha `PROTHEUS_URL` com o endereço da genericQuery
+   (o mesmo usado no Postman, sem os parâmetros depois do `?`).
+4. Dê dois cliques em **`criar-atalho.bat`**.
+   Ele cria o atalho **Consulta de Romaneio** na área de trabalho e no menu Iniciar e já abre o app.
+
+A partir daí é só usar o atalho. Ele liga o servidor em segundo plano (sem janela preta) e abre
+o app numa janela própria do Edge ou do Chrome. Na primeira vez, entre com o seu usuário do Protheus.
+
+| Arquivo | Para quê |
+|---|---|
+| `criar-atalho.bat` | cria o atalho na área de trabalho e no menu Iniciar |
+| `abrir-app.vbs` | o que o atalho executa: liga o servidor (se preciso) e abre o app |
+| `parar-servidor.bat` | desliga o servidor que roda em segundo plano |
+| `iniciar.bat` | alternativa: roda o servidor numa janela visível (útil para ver erros) |
+
+### Instalar pelo navegador
+
+Com o servidor ligado, abra `http://localhost:3000` no Edge ou no Chrome e clique em
+**Instalar app** (no topo do app ou no ícone de instalar na barra de endereço).
+
+### Outros computadores da rede
+
+Um computador roda o servidor; os outros abrem o endereço **Na rede** que aparece no `iniciar.bat`
+(ex.: `http://192.168.0.25:3000`). Libere a porta 3000 no Firewall do Windows desse computador.
+Para virar app nos outros computadores: no Edge, menu **⋯ → Aplicativos → Instalar este site como aplicativo**;
+no Chrome, menu **⋮ → Transmitir, salvar e compartilhar → Criar atalho** (marque *Abrir como janela*).
+
+## Login (modo com servidor)
+
+- Cada pessoa entra com o **próprio usuário do Protheus**. O app testa o login no Protheus na hora.
+- A senha não é gravada em disco: fica só na memória do servidor enquanto a sessão estiver aberta.
+- A sessão encerra depois de `HORAS_SESSAO` horas sem uso (padrão 10) ou ao clicar em **Sair**.
+  Reiniciar o servidor também encerra todas as sessões.
 
 ## Conferir com o packing list
 
-Depois de buscar o romaneio, desça até **Conferir com packing list** e envie a planilha do
-cliente/fornecedor de um destes jeitos:
+Depois de buscar o romaneio, desça até **Conferir com packing list** e envie a planilha:
 
-- **PDF** (recomendado): no Excel, *Arquivo → Salvar como → PDF* e arraste o PDF para a página.
-  O PDF do Excel traz o texto de verdade, então os números são lidos **exatos, sem OCR**.
-  PDF escaneado (só imagem) também funciona: o site extrai a imagem e usa o OCR;
-- **Print**: tire o print da tabela e aperte **Ctrl+V** na página;
-- **Imagem**: arraste um PNG/JPG para a área tracejada, ou clique em "Escolher arquivo";
-- **Planilha**: arraste o .xlsx ou .csv (é o jeito mais preciso);
-- **Texto**: copie as linhas no Excel e aperte Ctrl+V na página.
-
-O site lê cada linha (código, descrição, TOTAL QUANTITY ROLL e **TOTAL N.W.**) e compara com
-o sistema produto a produto:
+- **PDF** (recomendado): no Excel, *Arquivo → Salvar como → PDF*. O PDF do Excel traz o texto,
+  então os números são lidos **exatos, sem OCR**. PDF escaneado também funciona (usa OCR);
+- **Print**: copie o print da tabela e aperte **Ctrl+V** na página;
+- **Imagem** (PNG/JPG) ou **planilha** (XLSX/CSV): arraste para a área tracejada;
+- **Texto**: copie as linhas no Excel e aperte Ctrl+V.
 
 | Coluna | Significado |
 |---|---|
@@ -32,75 +98,47 @@ o sistema produto a produto:
 | Divergência (kg) | N.W. da planilha − Qtde atual do sistema. Positivo: o sistema está com menos peso |
 | Ajustar sistema para | o valor da planilha, para lançar no Protheus |
 
-- Funciona com planilhas em formatos diferentes (com ou sem as colunas COLOR, LOTE e G.W.):
-  o peso comparado é sempre o TOTAL N.W.
-- Os números lidos da imagem ficam nas **células azuis**: se o OCR ler algo errado, corrija ali
-  e a comparação refaz na hora. Confira olhando a imagem, que fica fixada na tela.
-- Se a linha "Total General" da imagem não bater com a soma das linhas lidas, aparece um aviso.
-- A tolerância padrão é 0,05 kg (só o arredondamento da planilha, que vem com 1 casa decimal). Dá para mudar na tela.
-- "Copiar divergências" e "Baixar divergências (CSV)" levam só o que precisa de ajuste.
-- A leitura de PDF, imagem e .xlsx baixa o leitor (pdf.js / Tesseract.js / SheetJS) da internet na primeira
-  vez, então o computador precisa de acesso à internet. A imagem é lida no próprio navegador
-  e não é enviada a nenhum servidor.
-- O código do produto nem sempre sai legível num print pequeno. Por isso o site casa cada linha
-  com o produto pelo código **ou** pela descrição, o que bater melhor.
+- Aceita planilhas com ou sem as colunas COLOR, LOTE e G.W.; o peso comparado é sempre o **TOTAL N.W.**
+- Os números lidos ficam nas **células azuis** e podem ser corrigidos ali; a comparação refaz na hora.
+- Se a linha "Total" da planilha não bater com a soma das linhas lidas, aparece um aviso.
+- Tolerância padrão de 0,05 kg (arredondamento da planilha, que vem com 1 casa decimal).
+- **Copiar divergências** / **Baixar divergências (CSV)** levam só o que precisa de ajuste.
+- PDF, imagem e .xlsx são lidos no próprio navegador (pdf.js, Tesseract.js e SheetJS, baixados
+  da internet na primeira vez). O arquivo não é enviado a nenhum servidor.
 
-## Como rodar no Windows
+## Configuração (`.env`)
 
-1. Instale o **Node.js** (versão LTS) em https://nodejs.org, se ainda não tiver.
-2. Descompacte esta pasta onde quiser.
-3. Dê dois cliques em **`iniciar.bat`**.
-   - Na primeira vez, ele cria o arquivo `.env` e abre o Bloco de Notas.
-     Preencha `PROTHEUS_USER` e `PROTHEUS_PASS` (o mesmo login do Postman), salve e feche.
-   - Rode o `iniciar.bat` de novo.
-4. O navegador abre em **http://localhost:3000**. Deixe a janela preta aberta enquanto usar o site.
-
-## Usar em outros computadores da rede
-
-Ao iniciar, a janela mostra um endereço "Na rede", por exemplo `http://192.168.0.25:3000`.
-Qualquer computador da mesma rede pode abrir esse endereço. Se não abrir, libere a porta
-3000 no Firewall do Windows do computador que roda o servidor.
-
-Para deixar sempre ligado, rode o servidor num computador que fique ligado (ou num servidor
-da empresa) e coloque o `iniciar.bat` na inicialização do Windows.
-
-## Link direto para um romaneio
-
-`http://localhost:3000/?r=00529749` já abre com o romaneio consultado. Dá para mandar esse link
-para alguém da rede (troque `localhost` pelo endereço "Na rede").
+| Variável | Padrão | Descrição |
+|---|---|---|
+| `PROTHEUS_URL` | — | endereço da genericQuery (obrigatório) |
+| `PROTHEUS_IGNORE_SSL` | `1` | aceita o certificado interno do Protheus |
+| `PORT` | `3000` | porta do app |
+| `HORAS_SESSAO` | `10` | horas sem uso até pedir login de novo |
+| `CAMPO_PRODUTO` | `Z5_PROD` | campo do produto na SZ5 |
+| `CAMPO_QUANTIDADE` | `Z5_PESOATU` | campo da quantidade atual na SZ5 |
 
 ## Como funciona
 
 ```
-Navegador  →  server.js (este computador)  →  Protheus genericQuery
+App (navegador)  →  server.js (este computador)  →  Protheus genericQuery
 ```
 
-O navegador conversa só com o `server.js`. O servidor faz as consultas no Protheus com o
-login do `.env`, então a senha não fica exposta na página.
-
-Consultas feitas a cada busca:
+O navegador conversa só com o `server.js`, que faz as consultas no Protheus com o login da sessão.
 
 | Tabela | Campos | Para quê |
 |---|---|---|
 | SZ5 | `Z5_FILIAL, Z5_PROD, Z5_PESOATU, Z5_NUMERO, Z5_SERIE, Z5_OP, Z5_PARTIDA` filtrado por `Z5_ROMAN` | rolos do romaneio |
 | SB1 | `B1_COD, B1_DESC` | descrição dos produtos |
 
-## Arquivos
+Rotas: `GET /api/romaneio?numero=…&filial=…`, `GET /api/campos` (lista os campos da SZ5 pelo SX3),
+`GET /api/status`, `POST /api/login`, `POST /api/logout`.
 
-| Arquivo | O que é |
-|---|---|
-| `server.js` | servidor do site e consultas no Protheus |
-| `public/` | páginas do site (HTML, CSS e JavaScript) |
-| `.env.exemplo` | modelo de configuração; copie para `.env` |
-| `iniciar.bat` | inicia o site no Windows |
-| `iniciar.sh` | inicia o site no Linux ou Mac |
+Sem dependências: só Node.js 18+.
 
 ## Problemas comuns
 
-- **"O Protheus recusou o usuário ou a senha"**: confira `PROTHEUS_USER` e `PROTHEUS_PASS` no `.env`.
-- **"Não foi possível conectar ao Protheus"**: o computador precisa alcançar
-  `protheus.quatroktextil.com.br:6632` (teste a mesma URL no Postman nesse computador).
-- **"O servidor do site não respondeu"**: a janela do `iniciar.bat` foi fechada. Abra de novo.
+- **"Usuário ou senha incorretos"**: é o login do Protheus; teste o mesmo usuário no Postman.
+- **"Não foi possível conectar ao Protheus"**: o computador do servidor precisa alcançar o endereço
+  de `PROTHEUS_URL` (teste a mesma URL no Postman nesse computador).
+- **O atalho não abre**: rode `iniciar.bat` para ver a mensagem de erro, ou veja `servidor.log`.
 - **Porta 3000 ocupada**: mude `PORT` no `.env`.
-- **Conferir campos da SZ5**: com o site rodando, abra `http://localhost:3000/api/campos`
-  para ver a lista do dicionário (SX3).

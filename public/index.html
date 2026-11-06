@@ -4,11 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Consulta de Romaneio</title>
-<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icone-192.png">
+<meta name="theme-color" content="#161b3d">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&family=JetBrains+Mono:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="app.css">
 </head>
 <body>
 
@@ -20,6 +23,12 @@
         <div class="marca-nome">Consulta de Romaneio</div>
         <div class="marca-sub">Rolos de malha por produto · Protheus</div>
       </div>
+    </div>
+
+    <div class="usuario" id="usuarioBox" hidden>
+      <span class="usuario-nome"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span id="usuarioNome"></span></span>
+      <button type="button" id="btnInstalar" hidden>Instalar app</button>
+      <button type="button" id="btnSair">Sair</button>
     </div>
 
     <form id="busca" class="busca" autocomplete="off" role="search">
@@ -41,11 +50,37 @@
 </header>
 
 <main class="conteudo">
+  <!-- Login -->
+  <section id="login" class="login" hidden>
+    <form id="formLogin" class="login-card" autocomplete="on">
+      <svg class="login-ico" viewBox="0 0 32 32" aria-hidden="true"><use href="#ico-rolo"/></svg>
+      <h1>Entrar</h1>
+      <p>Use o mesmo usuário e senha do Protheus.</p>
+      <label class="login-campo" id="loginServidorBox" hidden>Endereço do Protheus (REST)
+        <input id="loginServidor" inputmode="url" autocomplete="url" spellcheck="false" autocapitalize="none" placeholder="https://servidor:porta/rest/api/framework/v1/genericQuery">
+        <small>O mesmo endereço usado no Postman. Fica salvo neste navegador.</small>
+      </label>
+      <label class="login-campo">Usuário
+        <input id="loginUsuario" name="username" autocomplete="username" required autocapitalize="none" spellcheck="false">
+      </label>
+      <label class="login-campo">Senha
+        <span class="senha-wrap">
+          <input id="loginSenha" name="password" type="password" autocomplete="current-password" required>
+          <button type="button" id="verSenha" aria-label="Mostrar senha">Mostrar</button>
+        </span>
+      </label>
+      <label class="chk" id="lembrarBox" hidden><input type="checkbox" id="lembrar"> Continuar conectado neste computador</label>
+      <div id="loginErro" class="alerta alerta-erro" role="alert" hidden></div>
+      <button id="btnEntrar" class="btn-entrar" type="submit">Entrar</button>
+      <p class="login-nota" id="loginNota">Use o seu usuário do Protheus. A senha não é gravada em disco.</p>
+    </form>
+  </section>
+
   <div id="erro" class="alerta alerta-erro" role="alert" hidden></div>
   <div id="aviso" class="alerta alerta-aviso" hidden></div>
 
   <!-- Estado inicial -->
-  <section id="inicio" class="inicio">
+  <section id="inicio" class="inicio" hidden>
     <svg class="inicio-ico" viewBox="0 0 32 32" aria-hidden="true"><use href="#ico-rolo"/></svg>
     <h1>Digite o número do romaneio</h1>
     <p>A consulta mostra cada produto do romaneio com a quantidade de rolos e a quantidade atual em quilos. Clique num produto para ver os rolos um a um.</p>
@@ -215,7 +250,8 @@
   </symbol>
 </svg>
 
-<script src="/app.js"></script>
-<script src="/conferencia.js"></script>
+<script src="protheus.js"></script>
+<script src="app.js"></script>
+<script src="conferencia.js"></script>
 </body>
 </html>
