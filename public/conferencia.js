@@ -474,8 +474,12 @@
     return melhor;
   }
 
+  // Divergência de peso: negativo sempre conta; positivo só acima da tolerância
+  const foraTol = (d, tol) => d < -1e-9 || d > tol + 1e-9;
+
   function comparar() {
-    const tol = Math.max(0, numero($('confTol').value) ?? 0.05);
+    // Tolerância só para mais (planilha acima do sistema). Qualquer valor negativo é divergente.
+    const tol = Math.max(0, numero($('confTol').value) ?? 1);
     const sistema = window.romaneioAtual.produtos;
     // Calcula a semelhança de cada linha lida com cada produto e casa os pares mais parecidos primeiro.
     const cand = [];
@@ -498,7 +502,7 @@
       let status = 'ok';
       if (!it) status = 'so-sistema';
       else if (it.nw == null) status = 'sem-peso';
-      else if (Math.abs(dPeso) > tol + 1e-9 || (dRolos != null && dRolos !== 0)) status = 'divergente';
+      else if (foraTol(dPeso, tol) || (dRolos != null && dRolos !== 0)) status = 'divergente';
       return { p, it, aprox: par?.aprox, dRolos, dPeso, status };
     });
     for (const it of restantes) linhas.push({ p: null, it, status: 'so-planilha', dRolos: null, dPeso: null });
@@ -528,14 +532,14 @@
 
     $('confStatus').className = 'conf-veredito ' + (nDiv || nFalta ? 'tem-div' : 'tudo-ok');
     $('confStatus').innerHTML = nDiv || nFalta
-      ? `<strong>${nDiv + nFalta} ${nDiv + nFalta === 1 ? 'produto precisa' : 'produtos precisam'} de ajuste</strong><span>${nOk} de ${linhas.length} conferem (tolerância de ${kg(tol)} kg)</span>`
-      : `<strong>Tudo confere</strong><span>Os ${nOk} produtos batem com o sistema (tolerância de ${kg(tol)} kg)</span>`;
+      ? `<strong>${nDiv + nFalta} ${nDiv + nFalta === 1 ? 'produto precisa' : 'produtos precisam'} de ajuste</strong><span>${nOk} de ${linhas.length} conferem (tolerância de até +${kg(tol)} kg)</span>`
+      : `<strong>Tudo confere</strong><span>Os ${nOk} produtos batem com o sistema (tolerância de até +${kg(tol)} kg)</span>`;
 
     $('confTotais').innerHTML = `
       <div><span class="rotulo">Rolos planilha / sistema</span><b>${int(somaRolPL)} / ${int(sis.totalRolos)}</b>${somaRolPL !== sis.totalRolos ? `<em class="neg">${somaRolPL - sis.totalRolos > 0 ? '+' : ''}${somaRolPL - sis.totalRolos}</em>` : ''}</div>
       <div><span class="rotulo">Peso na planilha</span><b>${kg(somaPL)} kg</b></div>
       <div><span class="rotulo">Peso no sistema</span><b>${kg(sis.totalQuantidade)} kg</b></div>
-      <div><span class="rotulo">Diferença total</span><b class="${Math.abs(dTotal) > tol ? 'neg' : ''}">${kgSinal(dTotal)} kg</b></div>`;
+      <div><span class="rotulo">Diferença total</span><b class="${foraTol(dTotal, tol) ? 'neg' : ''}">${kgSinal(dTotal)} kg</b></div>`;
 
     // Resumo: quanto foi lido, quanto diverge e quantos produtos alterar
     const divs = linhas.filter((l) => l.status === 'divergente');
@@ -554,7 +558,7 @@
       `Foram lidas <b>${plural(itensPL.length, 'linha', 'linhas')}</b> (${kg(somaPL)} kg · ${int(somaRolPL)} rolos).`,
       divs.length
         ? `<b class="neg">${plural(divs.length, 'produto', 'produtos')} com divergência</b>, somando ${kgSinal(somaDiv)} kg.`
-        : 'Nenhuma divergência acima da tolerância.',
+        : 'Nenhuma divergência fora da tolerância.',
       nAjustar ? `Alterar <b>${plural(nAjustar, 'produto', 'produtos')}</b> no sistema.` : '',
       extras.length ? extras.join(' · ').replace(/^./, (c) => c.toUpperCase()) + '.' : '',
     ].filter(Boolean);
@@ -581,7 +585,7 @@
         <td class="n col-dest ${l.dRolos ? 'neg forte' : ''}">${l.dRolos == null ? '–' : l.dRolos === 0 ? '0' : (l.dRolos > 0 ? '+' : '') + l.dRolos}</td>
         <td class="n">${ed('nw', l.it?.nw, true)}</td>
         <td class="n">${l.p ? kg(l.p.quantidade) : '–'}</td>
-        <td class="n col-dest ${l.status === 'divergente' && Math.abs(l.dPeso) > tol + 1e-9 ? 'neg forte' : ''}">${l.dPeso == null ? '–' : kgSinal(l.dPeso)}</td>
+        <td class="n col-dest ${l.status === 'divergente' && foraTol(l.dPeso, tol) ? 'neg forte' : ''}">${l.dPeso == null ? '–' : kgSinal(l.dPeso)}</td>
         <td class="n col-dest col-ajuste ${l.status === 'divergente' ? 'forte' : ''}">${l.p && l.it?.nw != null ? kg(l.it.nw) : '–'}</td>
       </tr>`;
     });

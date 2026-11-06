@@ -235,7 +235,7 @@
         <div class="conf-controles">
           <div class="conf-opcoes">
             <label class="chave"><input type="checkbox" id="confSoDiv"><span class="chave-trilho"></span> Mostrar só o que precisa de ajuste</label>
-            <label class="tol">Tolerância <input id="confTol" value="0,05" inputmode="decimal" aria-label="Tolerância em kg"> kg</label>
+            <label class="tol" title="Diferença aceita só quando a planilha tem mais peso que o sistema. Negativo é sempre divergente.">Tolerância para mais <input id="confTol" value="1,00" inputmode="decimal" aria-label="Tolerância em kg, só para mais"> kg</label>
           </div>
           <div class="acoes">
             <button class="btn-pri" id="confXlsx" type="button">
@@ -268,7 +268,7 @@
             <tbody id="confCorpo"></tbody>
           </table>
         </div>
-        <p class="conf-legenda">Divergência = Peso na planilha − Peso no sistema. Positivo: o sistema está com menos peso que a planilha. Negativo: está com mais. "Ajustar sistema para" é o peso da planilha.</p>
+        <p class="conf-legenda">Divergência = Peso na planilha − Peso no sistema. Positivo: o sistema está com menos peso que a planilha. Negativo: está com mais. A tolerância vale só para mais (positivo); qualquer valor negativo é divergente. "Ajustar sistema para" é o peso da planilha.</p>
       </div>
     </section>
   </section>
