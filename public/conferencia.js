@@ -17,8 +17,8 @@
   let itensPL = [];          // linhas lidas do packing list
   let totalPL = null;        // linha "Total" lida do packing list, se houver
   let origem = '';
-  let imagemUrl = null;
-  let zoom = 100;
+  let imagemUrl = null;      // imagem usada pelo OCR (uso interno)
+  let arquivo = null;        // arquivo enviado: { nome, tamanho, tipo, url, hora }
 
   // ---------- Utilidades de leitura ----------
   function numero(v) {
@@ -239,7 +239,6 @@
   async function lerImagem(arquivo) {
     if (imagemUrl) URL.revokeObjectURL(imagemUrl);
     imagemUrl = URL.createObjectURL(arquivo);
-    mostrarImagem();
     return ocr(imagemUrl);
   }
 
@@ -285,24 +284,6 @@
         linhas.push(txt);
       }
     }
-
-    // Imagem das páginas para ficar fixada na tela
-    const escalaVer = 2;
-    const telas = [];
-    for (const pag of paginas.slice(0, 5)) {
-      const vp = pag.getViewport({ scale: escalaVer });
-      const c = document.createElement('canvas'); c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
-      const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
-      await pag.render({ canvasContext: g, viewport: vp }).promise;
-      telas.push(c);
-    }
-    const junta = document.createElement('canvas');
-    junta.width = Math.max(...telas.map((c) => c.width)); junta.height = telas.reduce((t, c) => t + c.height, 0);
-    const gj = junta.getContext('2d'); gj.fillStyle = '#fff'; gj.fillRect(0, 0, junta.width, junta.height);
-    let y = 0; for (const c of telas) { gj.drawImage(c, 0, y); y += c.height; }
-    if (imagemUrl) URL.revokeObjectURL(imagemUrl);
-    imagemUrl = URL.createObjectURL(await new Promise((ok) => junta.toBlob(ok, 'image/png')));
-    mostrarImagem();
 
     if (caracteres > 30) {
       const r = lerLinhasTexto(linhas);
@@ -370,13 +351,15 @@
 
   function lerTexto(txt) {
     const linhas = txt.split(/\r?\n/).filter((l) => l.trim());
-    const colunas = linhas.some((l) => l.split('\t').length > 3);
-    return colunas ? lerTabela(linhas.map((l) => l.split('\t'))) : lerTabela(linhas.map((l) => [l]));
+    // Separador: tabulação (copiado do Excel) ou ponto e vírgula (CSV do Excel em português)
+    const sep = ['\t', ';'].find((x) => linhas.some((l) => l.split(x).length > 3));
+    return sep ? lerTabela(linhas.map((l) => l.split(sep))) : lerTabela(linhas.map((l) => [l]));
   }
 
   async function receber(fonte) {
     if (!window.romaneioAtual) { erro('Busque o romaneio primeiro e depois envie o packing list.'); return; }
     erro('');
+    registrarArquivo(fonte);
     try {
       let r;
       if (fonte instanceof File && (fonte.type === 'application/pdf' || /\.pdf$/i.test(fonte.name))) {
@@ -387,9 +370,8 @@
       else if (fonte instanceof File) {
         origem = 'planilha';
         if (imagemUrl) { URL.revokeObjectURL(imagemUrl); imagemUrl = null; }
-        mostrarImagem();
         r = /\.(csv|txt|tsv)$/i.test(fonte.name) ? lerTexto(await fonte.text()) : await lerPlanilha(fonte);
-      } else { origem = 'texto'; if (imagemUrl) { URL.revokeObjectURL(imagemUrl); imagemUrl = null; } mostrarImagem(); r = lerTexto(fonte); }
+      } else { origem = 'texto'; if (imagemUrl) { URL.revokeObjectURL(imagemUrl); imagemUrl = null; } r = lerTexto(fonte); }
       progresso('');
       if (!r.itens.length) {
         erro(origem === 'imagem'
@@ -417,19 +399,44 @@
     }
   }
 
-  // ---------- Imagem fixada ----------
-  function mostrarImagem() {
-    const tem = !!imagemUrl;
-    $('confImgBox').hidden = !tem;
-    $('confLayout').classList.toggle('com-img', tem);
-    if (tem) { $('confImg').src = imagemUrl; $('confImgLink').href = imagemUrl; aplicarZoom(); }
+  // ---------- Arquivo enviado (cartão no estilo de download do navegador) ----------
+  const tamanhoTxt = (b) => (b < 1024 ? `${b} B` : b < 1048576 ? `${(b / 1024).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} KB` : `${(b / 1048576).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} MB`);
+  function tipoArquivo(f) {
+    const n = (f.name || '').toLowerCase();
+    if (f.type === 'application/pdf' || n.endsWith('.pdf')) return ['PDF', 'Documento PDF', 'pdf'];
+    if (f.type.startsWith('image/')) return [(f.type.split('/')[1] || 'IMG').toUpperCase().replace('JPEG', 'JPG').slice(0, 4), 'Imagem', 'img'];
+    if (/\.(xlsx|xls)$/.test(n)) return ['XLS', 'Planilha do Excel', 'xls'];
+    if (n.endsWith('.csv')) return ['CSV', 'Planilha CSV', 'xls'];
+    return ['TXT', 'Arquivo de texto', 'txt'];
   }
-  function aplicarZoom() { $('confImg').style.width = zoom + '%'; $('confZoomTxt').textContent = zoom + '%'; }
-  $('confZoomMais').addEventListener('click', () => { zoom = Math.min(300, zoom + 25); aplicarZoom(); });
-  $('confZoomMenos').addEventListener('click', () => { zoom = Math.max(50, zoom - 25); aplicarZoom(); });
-  $('confFixar').checked = window.innerWidth >= 1500;
-  $('confLayout').classList.toggle('lado', $('confFixar').checked);
-  $('confFixar').addEventListener('change', (e) => $('confLayout').classList.toggle('lado', e.target.checked));
+  function registrarArquivo(fonte) {
+    if (arquivo?.url) URL.revokeObjectURL(arquivo.url);
+    const hora = new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+    if (fonte instanceof File) {
+      const [sigla, desc, cls] = tipoArquivo(fonte);
+      arquivo = { nome: fonte.name || 'arquivo', tamanho: fonte.size, sigla, desc, cls, url: URL.createObjectURL(fonte), hora };
+    } else {
+      const linhas = String(fonte).split(/\r?\n/).filter((l) => l.trim()).length;
+      arquivo = { nome: 'Texto colado', tamanho: null, sigla: 'TXT', desc: `${linhas} linhas coladas`, cls: 'txt', url: null, hora };
+    }
+    mostrarArquivo();
+  }
+  function mostrarArquivo() {
+    const a = arquivo;
+    $('confArquivoCard').hidden = !a;
+    if (!a) return;
+    $('confArqIco').textContent = a.sigla;
+    $('confArqIco').className = 'arquivo-ico ico-' + a.cls;
+    $('confArqNome').textContent = a.nome;
+    $('confArqMeta').textContent = [a.desc, a.tamanho != null ? tamanhoTxt(a.tamanho) : '', `enviado em ${a.hora}`].filter(Boolean).join(' · ');
+    const abrir = $('confArqAbrir');
+    abrir.hidden = !a.url;
+    if (a.url) {
+      abrir.href = a.url;
+      // Planilha não abre no navegador: baixa com o nome original
+      if (a.cls === 'xls') abrir.setAttribute('download', a.nome); else abrir.removeAttribute('download');
+    }
+  }
 
   // ---------- Comparação ----------
   // Texto normalizado para comparar: ignora espaços e as trocas típicas do OCR.
@@ -526,15 +533,32 @@
 
     $('confTotais').innerHTML = `
       <div><span class="rotulo">Rolos planilha / sistema</span><b>${int(somaRolPL)} / ${int(sis.totalRolos)}</b>${somaRolPL !== sis.totalRolos ? `<em class="neg">${somaRolPL - sis.totalRolos > 0 ? '+' : ''}${somaRolPL - sis.totalRolos}</em>` : ''}</div>
-      <div><span class="rotulo">N.W. planilha</span><b>${kg(somaPL)} kg</b></div>
-      <div><span class="rotulo">Qtde atual sistema</span><b>${kg(sis.totalQuantidade)} kg</b></div>
+      <div><span class="rotulo">Peso na planilha</span><b>${kg(somaPL)} kg</b></div>
+      <div><span class="rotulo">Peso no sistema</span><b>${kg(sis.totalQuantidade)} kg</b></div>
       <div><span class="rotulo">Diferença total</span><b class="${Math.abs(dTotal) > tol ? 'neg' : ''}">${kgSinal(dTotal)} kg</b></div>`;
 
-    let avisoTotal = '';
-    if (totalPL && totalPL.nw != null && Math.abs(totalPL.nw - somaPL) > 0.5) {
-      avisoTotal = `A linha "Total" da planilha diz ${kg(totalPL.nw)} kg, mas a soma das linhas lidas dá ${kg(somaPL)} kg. Alguma linha pode ter sido lida errado ou ficado de fora: confira a imagem.`;
-    }
-    $('confAvisoTotal').textContent = avisoTotal; $('confAvisoTotal').hidden = !avisoTotal;
+    // Resumo: quanto foi lido, quanto diverge e quantos produtos alterar
+    const divs = linhas.filter((l) => l.status === 'divergente');
+    const somaDiv = +divs.reduce((s, l) => s + (l.dPeso || 0), 0).toFixed(2);
+    const nAjustar = divs.filter((l) => l.p && l.it?.nw != null).length;
+    const nSoSis = linhas.filter((l) => l.status === 'so-sistema').length;
+    const nSoPl = linhas.filter((l) => l.status === 'so-planilha').length;
+    const nSemPeso = linhas.filter((l) => l.status === 'sem-peso').length;
+    const extras = [
+      nSoSis ? `${nSoSis} ${nSoSis === 1 ? 'produto falta' : 'produtos faltam'} na planilha` : '',
+      nSoPl ? `${nSoPl} ${nSoPl === 1 ? 'linha falta' : 'linhas faltam'} no sistema` : '',
+      nSemPeso ? `${nSemPeso} sem peso lido` : '',
+    ].filter(Boolean);
+    const plural = (n, um, varios) => `${int(n)} ${n === 1 ? um : varios}`;
+    const frases = [
+      `Foram lidas <b>${plural(itensPL.length, 'linha', 'linhas')}</b> (${kg(somaPL)} kg · ${int(somaRolPL)} rolos).`,
+      divs.length
+        ? `<b class="neg">${plural(divs.length, 'produto', 'produtos')} com divergência</b>, somando ${kgSinal(somaDiv)} kg.`
+        : 'Nenhuma divergência acima da tolerância.',
+      nAjustar ? `Alterar <b>${plural(nAjustar, 'produto', 'produtos')}</b> no sistema.` : '',
+      extras.length ? extras.join(' · ').replace(/^./, (c) => c.toUpperCase()) + '.' : '',
+    ].filter(Boolean);
+    $('confResumo').innerHTML = frases.join(' ');
     $('confOrigem').textContent = `${itensPL.length} linhas lidas ${{ imagem: 'da imagem (OCR)', pdf: 'do PDF (texto exato, sem OCR)', planilha: 'da planilha', texto: 'do texto colado' }[origem] || ''}${origem === 'imagem' ? '. Confira os números lidos: dá para corrigir direto nas células azuis.' : '.'}`;
 
     let h = '';
@@ -546,7 +570,7 @@
       const lido = (l.it && l.p && l.aprox && l.status !== 'ok' ? `<div class="lido">lido como “${esc(l.it.codigo || l.it.descricao)}”</div>` : '')
         + (l.it?.corrigido ? '<div class="lido">vírgula do peso corrigida, confira na imagem</div>' : '');
       const ed = (campo, v, casas) => (idx >= 0
-        ? `<input class="ed" data-i="${idx}" data-c="${campo}" inputmode="decimal" value="${v == null ? '' : casas ? v.toLocaleString('pt-BR', { maximumFractionDigits: 3 }) : v}" aria-label="${campo === 'nw' ? 'N.W. da planilha' : 'Rolos da planilha'} de ${esc(cod)}">`
+        ? `<input class="ed" data-i="${idx}" data-c="${campo}" inputmode="decimal" value="${v == null ? '' : casas ? v.toLocaleString('pt-BR', { maximumFractionDigits: 3 }) : v}" aria-label="${campo === 'nw' ? 'Peso na planilha' : 'Rolos da planilha'} de ${esc(cod)}">`
         : '–');
       h += `<tr class="st-${cls}">
         <td><span class="pill pill-${cls}">${rot}</span></td>
@@ -554,11 +578,11 @@
         <td class="desc">${esc(l.p ? l.p.descricao : l.it.descricao)}</td>
         <td class="n">${ed('rolos', l.it?.rolos, false)}</td>
         <td class="n">${l.p ? int(l.p.rolos) : '–'}</td>
-        <td class="n ${l.dRolos ? 'neg' : ''}">${l.dRolos == null ? '–' : l.dRolos === 0 ? '0' : (l.dRolos > 0 ? '+' : '') + l.dRolos}</td>
+        <td class="n col-dest ${l.dRolos ? 'neg forte' : ''}">${l.dRolos == null ? '–' : l.dRolos === 0 ? '0' : (l.dRolos > 0 ? '+' : '') + l.dRolos}</td>
         <td class="n">${ed('nw', l.it?.nw, true)}</td>
         <td class="n">${l.p ? kg(l.p.quantidade) : '–'}</td>
-        <td class="n div-col ${l.status === 'divergente' && Math.abs(l.dPeso) > tol + 1e-9 ? 'neg forte' : ''}">${l.dPeso == null ? '–' : kgSinal(l.dPeso)}</td>
-        <td class="n">${l.p && l.it?.nw != null ? kg(l.it.nw) : '–'}</td>
+        <td class="n col-dest ${l.status === 'divergente' && Math.abs(l.dPeso) > tol + 1e-9 ? 'neg forte' : ''}">${l.dPeso == null ? '–' : kgSinal(l.dPeso)}</td>
+        <td class="n col-dest col-ajuste ${l.status === 'divergente' ? 'forte' : ''}">${l.p && l.it?.nw != null ? kg(l.it.nw) : '–'}</td>
       </tr>`;
     });
     $('confCorpo').innerHTML = h;
@@ -578,32 +602,162 @@
   $('confTol').addEventListener('change', renderConferencia);
 
   // ---------- Exportar divergências ----------
-  const n2 = (n) => (n == null ? '' : n.toLocaleString('pt-BR', { useGrouping: false, minimumFractionDigits: 2, maximumFractionDigits: 3 }));
-  function linhasDiv() {
-    const rows = ultima.linhas.filter((l) => l.status !== 'ok');
-    return [['Romaneio', 'Situação', 'Código', 'Produto', 'Rolos planilha', 'Rolos sistema', 'Dif. rolos', 'N.W. planilha (kg)', 'Qtde atual sistema (kg)', 'Divergência (kg)', 'Ajustar sistema para (kg)'],
-      ...rows.map((l) => [window.romaneioAtual.numero, STATUS[l.status][0], l.p ? l.p.codigo : l.it.codigo, l.p ? l.p.descricao : l.it.descricao,
-        l.it?.rolos ?? '', l.p?.rolos ?? '', l.dRolos ?? '', n2(l.it?.nw), n2(l.p?.quantidade), n2(l.dPeso), l.p && l.it?.nw != null ? n2(l.it.nw) : ''].map(String))];
-  }
-  $('confCopiar').addEventListener('click', async () => {
-    const tsv = linhasDiv().map((l) => l.join('\t')).join('\n');
-    try { await navigator.clipboard.writeText(tsv); window.mostrarToast?.('Divergências copiadas. Cole no Excel com Ctrl+V.'); }
-    catch { window.mostrarToast?.('Não foi possível copiar.'); }
+  const paraAjuste = () => ultima.linhas.filter((l) => l.status !== 'ok');
+  const nomeBase = () => `divergencias-romaneio-${window.romaneioAtual.numero}`;
+  const agoraTxt = () => new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+  const EMPRESA = 'Quatro K Textil LTDA';
+
+  // .xlsx (números como números, para somar no Excel)
+  $('confXlsx').addEventListener('click', async () => {
+    if (!ultima) return;
+    const b = $('confXlsx'); b.disabled = true;
+    try {
+      await script(XLSX_URL);
+      const cab = ['Situação', 'Código', 'Produto', 'Rolos planilha', 'Rolos sistema', 'Dif. rolos', 'Peso na planilha (kg)', 'Peso no sistema (kg)', 'Divergência (kg)', 'Ajustar sistema para (kg)'];
+      const linhas = paraAjuste().map((l) => [STATUS[l.status][0], l.p ? l.p.codigo : l.it.codigo, l.p ? l.p.descricao : l.it.descricao,
+        l.it?.rolos ?? null, l.p?.rolos ?? null, l.dRolos ?? null, l.it?.nw ?? null, l.p?.quantidade ?? null, l.dPeso ?? null, l.p && l.it?.nw != null ? l.it.nw : null]);
+      const aoa = [[`Divergências do romaneio ${window.romaneioAtual.numero}`], [`${EMPRESA} · gerado em ${agoraTxt()}`], [], cab, ...linhas];
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      ws['!cols'] = [{ wch: 18 }, { wch: 18 }, { wch: 44 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 16 }, { wch: 16 }, { wch: 15 }, { wch: 20 }];
+      for (let r = 4; r < aoa.length; r++) for (const c of [6, 7, 8, 9]) { const ref = XLSX.utils.encode_cell({ r, c }); if (ws[ref]) ws[ref].z = '#,##0.00'; }
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Divergências');
+      XLSX.writeFile(wb, nomeBase() + '.xlsx');
+    } catch (e) { window.mostrarToast?.(e.message || 'Não foi possível gerar o .xlsx.'); }
+    finally { b.disabled = false; }
   });
-  $('confCsv').addEventListener('click', () => {
-    const csv = linhasDiv().map((l) => l.map((c) => /[;"\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c).join(';')).join('\r\n');
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
-    a.download = `divergencias-romaneio-${window.romaneioAtual.numero}.csv`;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+
+  // Dados do relatório (PDF e PNG)
+  function dadosRelatorio() {
+    const rows = paraAjuste();
+    const sis = window.romaneioAtual;
+    const somaPL = itensPL.reduce((s, i) => s + (i.nw || 0), 0);
+    const divs = rows.filter((l) => l.status === 'divergente');
+    return {
+      numero: sis.numero, quando: agoraTxt(),
+      resumo: [
+        ['Total lido', `${int(itensPL.length)} linhas · ${kg(somaPL)} kg`],
+        ['Peso no sistema', `${kg(sis.totalQuantidade)} kg`],
+        ['Divergência', `${int(divs.length)} produtos · ${kgSinal(+divs.reduce((s, l) => s + (l.dPeso || 0), 0).toFixed(2))} kg`],
+        ['Alterar no sistema', `${int(divs.filter((l) => l.p && l.it?.nw != null).length)} produtos`],
+      ],
+      cab: ['Situação', 'Código', 'Produto', 'Dif. rolos', 'Peso planilha', 'Peso sistema', 'Divergência', 'Ajustar para'],
+      linhas: rows.map((l) => ({
+        st: l.status, cls: STATUS[l.status][1],
+        c: [STATUS[l.status][0], l.p ? l.p.codigo : l.it.codigo, l.p ? l.p.descricao : l.it.descricao,
+          l.dRolos == null ? '–' : l.dRolos === 0 ? '0' : (l.dRolos > 0 ? '+' : '') + l.dRolos,
+          kg(l.it?.nw), l.p ? kg(l.p.quantidade) : '–', kgSinal(l.dPeso), l.p && l.it?.nw != null ? kg(l.it.nw) : '–'],
+      })),
+    };
+  }
+
+  // Imprimir / salvar em PDF: monta o relatório e imprime só ele
+  $('confPdf').addEventListener('click', () => {
+    if (!ultima) return;
+    const d = dadosRelatorio();
+    $('relatorio').innerHTML = `
+      <div class="rel-cab">
+        <div><div class="rel-empresa">${EMPRESA}</div><h1>Divergências do romaneio ${esc(d.numero)}</h1><div class="rel-sub">Conferência com packing list · gerado em ${esc(d.quando)}</div></div>
+      </div>
+      <div class="rel-resumo">${d.resumo.map(([a, b]) => `<div><span>${esc(a)}</span><b>${esc(b)}</b></div>`).join('')}</div>
+      <table><thead><tr>${d.cab.map((c, i) => `<th class="${i >= 3 ? 'n' : ''} ${i === 3 || i >= 6 ? 'dest' : ''}">${esc(c)}</th>`).join('')}</tr></thead>
+      <tbody>${d.linhas.length ? d.linhas.map((l) => `<tr class="st-${l.cls}">${l.c.map((v, i) => `<td class="${i >= 3 ? 'n' : ''} ${i === 3 || i >= 6 ? 'dest' : ''}">${esc(v)}</td>`).join('')}</tr>`).join('') : '<tr><td colspan="8">Nenhuma divergência.</td></tr>'}</tbody></table>
+      <p class="rel-nota">Divergência = Peso na planilha − Peso no sistema. "Ajustar para" é o peso da planilha, para lançar no Protheus.</p>`;
+    document.body.classList.add('imprimir-rel');
+    const fim = () => { document.body.classList.remove('imprimir-rel'); window.removeEventListener('afterprint', fim); };
+    window.addEventListener('afterprint', fim);
+    const titulo = document.title; document.title = nomeBase();
+    window.print();
+    document.title = titulo;
+    setTimeout(fim, 500);
+  });
+
+  // PNG: desenha o relatório num canvas (sempre no tema claro)
+  $('confPng').addEventListener('click', async () => {
+    if (!ultima) return;
+    const d = dadosRelatorio();
+    try { await document.fonts?.ready; } catch {}
+    const W = 1600, pad = 48, esc2 = 2;
+    const larg = [170, 190, 470, 110, 150, 150, 150, 150]; // soma 1540 - ajusta ao W
+    const totalL = larg.reduce((a, b) => a + b, 0), fator = (W - pad * 2) / totalL;
+    const cols = larg.map((x) => x * fator);
+    const hLinha = 42, hCab = 46;
+    const H = pad + 120 + 92 + 24 + hCab + Math.max(1, d.linhas.length) * hLinha + 70;
+    const c = document.createElement('canvas'); c.width = W * esc2; c.height = H * esc2;
+    const g = c.getContext('2d'); g.scale(esc2, esc2);
+    const F = '"IBM Plex Sans", "Segoe UI", Arial, sans-serif', M = '"IBM Plex Mono", Consolas, monospace';
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#0f2340'; g.fillRect(0, 0, W, 8);
+    let y = pad + 10;
+    g.fillStyle = '#5b6678'; g.font = `600 15px ${F}`; g.fillText(EMPRESA.toUpperCase(), pad, y);
+    y += 38; g.fillStyle = '#0f1b2d'; g.font = `700 32px ${F}`; g.fillText(`Divergências do romaneio ${d.numero}`, pad, y);
+    y += 30; g.fillStyle = '#5b6678'; g.font = `400 16px ${F}`; g.fillText(`Conferência com packing list · gerado em ${d.quando}`, pad, y);
+    // Resumo
+    y += 30; const wR = (W - pad * 2 - 3 * 14) / 4;
+    d.resumo.forEach(([a, b], i) => {
+      const x = pad + i * (wR + 14);
+      g.fillStyle = '#f4f6f9'; g.strokeStyle = '#dde2ea'; g.lineWidth = 1;
+      g.beginPath(); g.roundRect ? g.roundRect(x, y, wR, 72, 8) : g.rect(x, y, wR, 72); g.fill(); g.stroke();
+      g.fillStyle = '#5b6678'; g.font = `600 12px ${F}`; g.fillText(a.toUpperCase(), x + 16, y + 26);
+      g.fillStyle = '#0f1b2d'; g.font = `600 19px ${M}`; g.fillText(b, x + 16, y + 54, wR - 32);
+    });
+    y += 72 + 34;
+    // Tabela
+    const dest = (i) => i === 3 || i >= 6;
+    let x = pad;
+    g.fillStyle = '#0f2340'; g.fillRect(pad, y, W - pad * 2, hCab);
+    cols.forEach((w, i) => {
+      if (dest(i)) { g.fillStyle = '#1f4e8c'; g.fillRect(x, y, w, hCab); }
+      g.fillStyle = '#ffffff'; g.font = `600 13px ${F}`;
+      g.textAlign = i >= 3 ? 'right' : 'left';
+      g.fillText(d.cab[i].toUpperCase(), i >= 3 ? x + w - 12 : x + 12, y + 29, w - 24);
+      x += w;
+    });
+    g.textAlign = 'left'; y += hCab;
+    const cores = { div: ['#fdecea', '#a3261e'], falta: ['#fdf4de', '#7b5500'], ok: ['#e3f4e8', '#1d6b3a'] };
+    if (!d.linhas.length) { g.fillStyle = '#5b6678'; g.font = `400 16px ${F}`; g.fillText('Nenhuma divergência.', pad + 12, y + 27); y += hLinha; }
+    d.linhas.forEach((l, k) => {
+      const [fundo, tinta] = cores[l.cls] || cores.ok;
+      g.fillStyle = k % 2 ? '#ffffff' : '#fafbfc'; g.fillRect(pad, y, W - pad * 2, hLinha);
+      x = pad;
+      cols.forEach((w, i) => {
+        if (dest(i)) { g.fillStyle = 'rgba(31,78,140,.07)'; g.fillRect(x, y, w, hLinha); }
+        const v = l.c[i];
+        if (i === 0) {
+          g.font = `700 12px ${F}`; const tw = g.measureText(v).width + 18;
+          g.fillStyle = fundo; g.beginPath(); g.roundRect ? g.roundRect(x + 10, y + 10, tw, 22, 11) : g.rect(x + 10, y + 10, tw, 22); g.fill();
+          g.fillStyle = tinta; g.fillText(v, x + 19, y + 25);
+        } else {
+          const neg = (i === 3 && v !== '0' && v !== '–') || (i === 6 && l.st === 'divergente');
+          g.fillStyle = neg ? '#a3261e' : '#0f1b2d';
+          g.font = `${dest(i) ? 700 : 400} ${i === 2 ? 14 : 15}px ${i === 2 ? F : M}`;
+          g.textAlign = i >= 3 ? 'right' : 'left';
+          let t = String(v);
+          while (t.length > 3 && g.measureText(t).width > w - 24) t = t.slice(0, -2) + '…';
+          g.fillText(t, i >= 3 ? x + w - 12 : x + 12, y + 27);
+          g.textAlign = 'left';
+        }
+        x += w;
+      });
+      g.strokeStyle = '#e6e9ef'; g.beginPath(); g.moveTo(pad, y + hLinha); g.lineTo(W - pad, y + hLinha); g.stroke();
+      y += hLinha;
+    });
+    g.fillStyle = '#5b6678'; g.font = `400 13px ${F}`;
+    g.fillText('Divergência = Peso na planilha − Peso no sistema. "Ajustar para" é o peso da planilha, para lançar no Protheus.', pad, y + 36);
+    c.toBlob((blob) => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = nomeBase() + '.png';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+    }, 'image/png');
   });
   $('confLimpar').addEventListener('click', limpar);
 
   function limpar() {
     itensPL = []; totalPL = null; ultima = null;
     if (imagemUrl) { URL.revokeObjectURL(imagemUrl); imagemUrl = null; }
-    mostrarImagem();
+    if (arquivo?.url) URL.revokeObjectURL(arquivo.url);
+    arquivo = null; mostrarArquivo();
     $('confResultado').hidden = true; erro(''); progresso('');
   }
 
@@ -618,7 +772,7 @@
 
   // Ctrl+V em qualquer lugar da página: print (imagem) ou linhas copiadas do Excel
   document.addEventListener('paste', (e) => {
-    if (!window.romaneioAtual || e.target.closest('input.ed, #filtro, #numero, #filial, #confTol')) return;
+    if (!window.romaneioAtual || e.target.closest('input.ed, #filtro, #numero, #confTol, #loginUsuario, #loginSenha')) return;
     const itens = [...(e.clipboardData?.items || [])];
     const img = itens.find((i) => i.type.startsWith('image/'));
     if (img) { e.preventDefault(); const f = img.getAsFile(); receber(new File([f], 'print.png', { type: f.type })); return; }

@@ -3,49 +3,74 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Consulta de Romaneio</title>
+<title>Consulta de Romaneio - Importação</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icone-192.png">
-<meta name="theme-color" content="#161b3d">
+<meta name="theme-color" content="#0f2340">
+<script>
+  // Tema antes de desenhar a página (evita piscar)
+  (function () {
+    var t = null;
+    try { t = localStorage.getItem('romaneio.tema'); } catch (e) {}
+    if (t !== 'claro' && t !== 'escuro') t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'escuro' : 'claro';
+    document.documentElement.dataset.tema = t;
+  })();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
 
 <header class="topo">
   <div class="topo-in">
-    <div class="marca">
-      <svg class="marca-ico" viewBox="0 0 32 32" aria-hidden="true"><use href="#ico-rolo"/></svg>
-      <div>
-        <div class="marca-nome">Consulta de Romaneio</div>
-        <div class="marca-sub">Rolos de malha por produto · Protheus</div>
+    <div class="topo-linha">
+      <div class="marca">
+        <span class="marca-selo"><svg viewBox="0 0 32 32" aria-hidden="true"><use href="#ico-rolo"/></svg></span>
+        <div>
+          <div class="marca-nome">Consulta de Romaneio <span class="marca-sep">-</span> Importação</div>
+          <div class="marca-sub">Malha por produto</div>
+        </div>
+      </div>
+
+      <div class="topo-acoes">
+        <div class="usuario" id="usuarioBox" hidden>
+          <span class="usuario-nome"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span id="usuarioNome"></span></span>
+          <button type="button" class="btn-topo" id="btnInstalar" hidden>Instalar app</button>
+          <button type="button" class="btn-topo" id="btnSair">Sair</button>
+        </div>
+        <button type="button" class="btn-tema" id="btnTema" aria-label="Alternar tema claro/escuro" title="Alternar tema claro/escuro">
+          <svg class="ico-sol" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>
+          <svg class="ico-lua" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/></svg>
+          <span id="btnTemaTxt">Tema escuro</span>
+        </button>
       </div>
     </div>
 
-    <div class="usuario" id="usuarioBox" hidden>
-      <span class="usuario-nome"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span id="usuarioNome"></span></span>
-      <button type="button" id="btnInstalar" hidden>Instalar app</button>
-      <button type="button" id="btnSair">Sair</button>
+    <div class="busca-area">
+      <form id="busca" class="busca" autocomplete="off" role="search">
+        <label class="campo campo-rom">
+          <span>Romaneio</span>
+          <input id="numero" inputmode="numeric" maxlength="8" placeholder="Digite o número..." required>
+        </label>
+        <button id="btnBuscar" class="btn-buscar" type="submit">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <span>Buscar</span>
+        </button>
+      </form>
+      <div class="historico" id="historico" hidden>
+        <button type="button" class="btn-historico" id="btnHistorico" aria-expanded="false" aria-controls="historicoPainel">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v4h4"/><path d="M12 7.5V12l3 2"/></svg>
+          Ver histórico <span class="historico-qtd" id="historicoQtd"></span>
+        </button>
+        <div class="historico-painel" id="historicoPainel" hidden>
+          <div class="historico-cab"><span>Romaneios consultados</span><button type="button" id="historicoLimpar">Limpar</button></div>
+          <ul id="historicoLista"></ul>
+        </div>
+      </div>
     </div>
-
-    <form id="busca" class="busca" autocomplete="off" role="search">
-      <label class="campo campo-rom">
-        <span>Romaneio</span>
-        <input id="numero" inputmode="numeric" maxlength="8" placeholder="00529749" required aria-describedby="atalho">
-      </label>
-      <label class="campo campo-fil">
-        <span>Filial</span>
-        <input id="filial" maxlength="10" placeholder="Todas">
-      </label>
-      <button id="btnBuscar" class="btn-buscar" type="submit">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <span>Buscar</span>
-      </button>
-    </form>
-    <div class="recentes" id="recentes" hidden></div>
   </div>
 </header>
 
@@ -53,12 +78,17 @@
   <!-- Login -->
   <section id="login" class="login" hidden>
     <form id="formLogin" class="login-card" autocomplete="on">
-      <svg class="login-ico" viewBox="0 0 32 32" aria-hidden="true"><use href="#ico-rolo"/></svg>
+      <div class="login-marca">
+        <span class="login-selo"><svg viewBox="0 0 32 32" aria-hidden="true"><use href="#ico-rolo"/></svg></span>
+        <div>
+          <div class="login-titulo">Consulta de Romaneio</div>
+          <div class="login-sub">Importação · Quatro K Textil LTDA</div>
+        </div>
+      </div>
       <h1>Entrar</h1>
       <p>Use o mesmo usuário e senha do Protheus.</p>
       <label class="login-campo" id="loginServidorBox" hidden>Endereço do Protheus (REST)
-        <input id="loginServidor" inputmode="url" autocomplete="url" spellcheck="false" autocapitalize="none" placeholder="https://servidor:porta/rest/api/framework/v1/genericQuery">
-        <small>O mesmo endereço usado no Postman. Fica salvo neste navegador.</small>
+        <input id="loginServidor" inputmode="url" autocomplete="url" spellcheck="false" autocapitalize="none">
       </label>
       <label class="login-campo">Usuário
         <input id="loginUsuario" name="username" autocomplete="username" required autocapitalize="none" spellcheck="false">
@@ -72,19 +102,26 @@
       <label class="chk" id="lembrarBox" hidden><input type="checkbox" id="lembrar"> Continuar conectado neste computador</label>
       <div id="loginErro" class="alerta alerta-erro" role="alert" hidden></div>
       <button id="btnEntrar" class="btn-entrar" type="submit">Entrar</button>
-      <p class="login-nota" id="loginNota">Use o seu usuário do Protheus. A senha não é gravada em disco.</p>
+      <p class="login-nota" id="loginNota">A senha não é gravada em disco.</p>
     </form>
   </section>
+
+  <!-- Boas-vindas depois do login -->
+  <div class="boas-vindas" id="boasVindas" hidden aria-live="polite">
+    <div class="bv-card">
+      <svg class="bv-check" viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="23"/><path d="m15 27 7 7 15-16"/></svg>
+      <div class="bv-txt">Bem-vindo, <b id="boasVindasNome"></b></div>
+    </div>
+  </div>
 
   <div id="erro" class="alerta alerta-erro" role="alert" hidden></div>
   <div id="aviso" class="alerta alerta-aviso" hidden></div>
 
   <!-- Estado inicial -->
   <section id="inicio" class="inicio" hidden>
-    <svg class="inicio-ico" viewBox="0 0 32 32" aria-hidden="true"><use href="#ico-rolo"/></svg>
+    <span class="inicio-selo"><svg viewBox="0 0 32 32" aria-hidden="true"><use href="#ico-rolo"/></svg></span>
     <h1>Digite o número do romaneio</h1>
-    <p>A consulta mostra cada produto do romaneio com a quantidade de rolos e a quantidade atual em quilos. Clique num produto para ver os rolos um a um.</p>
-    <p class="dica"><kbd>/</kbd> leva o cursor para a busca. Pode digitar sem os zeros à esquerda: <b>529749</b> vira <b>00529749</b>.</p>
+    <p>A consulta mostra cada produto do romaneio com a quantidade de rolos e o peso atual em quilos. Clique num produto para ver os rolos um a um.</p>
   </section>
 
   <!-- Carregando -->
@@ -138,7 +175,7 @@
     </div>
 
     <div class="tabela-wrap">
-      <table class="tabela">
+      <table class="tabela" id="tabelaProdutos">
         <thead>
           <tr>
             <th class="col-seta" aria-label="Detalhe"></th>
@@ -157,14 +194,12 @@
     <!-- Conferência com packing list -->
     <section class="conf" id="conferencia" aria-labelledby="confTitulo">
       <div class="conf-cab">
-        <div>
-          <h2 id="confTitulo">Conferir com packing list</h2>
-          <p>Compara, código por código, os rolos e o <b>TOTAL N.W.</b> da planilha com os rolos e a Qtde atual do sistema.</p>
-        </div>
+        <h2 id="confTitulo">Conferir com packing list</h2>
+        <p>Compara código por código para encontrar a divergência</p>
       </div>
 
       <div class="conf-zona" id="confZona" tabindex="0" role="button" aria-describedby="confZonaDica">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-8 8"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4"/><path d="m7.5 8.5 4.5-4.5 4.5 4.5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
         <div>
           <strong>Cole o print com <kbd>Ctrl</kbd>+<kbd>V</kbd></strong>
           <span id="confZonaDica">ou arraste aqui um <b>PDF</b>, uma imagem (PNG, JPG) ou a planilha (XLSX, CSV). PDF salvo pelo Excel é lido sem OCR, com os números exatos.</span>
@@ -180,63 +215,67 @@
       <div class="alerta alerta-erro" id="confErro" role="alert" hidden></div>
 
       <div id="confResultado" hidden>
+        <!-- Arquivo enviado, no estilo de um download do navegador -->
+        <div class="arquivo" id="confArquivoCard" hidden>
+          <span class="arquivo-ico" id="confArqIco">PDF</span>
+          <div class="arquivo-info">
+            <div class="arquivo-nome" id="confArqNome"></div>
+            <div class="arquivo-meta" id="confArqMeta"></div>
+          </div>
+          <a class="btn-sec arquivo-abrir" id="confArqAbrir" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/></svg>
+            Abrir
+          </a>
+        </div>
+
         <div class="conf-veredito" id="confStatus"></div>
         <div class="conf-totais" id="confTotais"></div>
-        <div class="alerta alerta-aviso" id="confAvisoTotal" hidden></div>
+        <p class="conf-resumo" id="confResumo"></p>
 
-        <div class="barra-ferr">
+        <div class="conf-controles">
           <div class="conf-opcoes">
-            <label class="chk"><input type="checkbox" id="confSoDiv"> Mostrar só o que precisa de ajuste</label>
+            <label class="chave"><input type="checkbox" id="confSoDiv"><span class="chave-trilho"></span> Mostrar só o que precisa de ajuste</label>
             <label class="tol">Tolerância <input id="confTol" value="0,05" inputmode="decimal" aria-label="Tolerância em kg"> kg</label>
-            <label class="chk"><input type="checkbox" id="confFixar"> Imagem ao lado</label>
           </div>
           <div class="acoes">
-            <button class="btn-sec" id="confCopiar" type="button">Copiar divergências</button>
-            <button class="btn-sec" id="confCsv" type="button">Baixar divergências (CSV)</button>
+            <button class="btn-pri" id="confXlsx" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M5 20h14"/></svg>
+              Baixar divergências (.xlsx)
+            </button>
+            <button class="btn-sec" id="confPdf" type="button">Imprimir / PDF</button>
+            <button class="btn-sec" id="confPng" type="button">Salvar PNG</button>
             <button class="btn-sec" id="confLimpar" type="button">Nova conferência</button>
           </div>
         </div>
         <p class="conf-origem" id="confOrigem"></p>
 
-        <div class="conf-layout" id="confLayout">
-          <figure class="conf-img" id="confImgBox" hidden>
-            <figcaption>
-              <span>Packing list enviado</span>
-              <span class="zoom">
-                <button type="button" id="confZoomMenos" aria-label="Diminuir">−</button>
-                <span id="confZoomTxt">100%</span>
-                <button type="button" id="confZoomMais" aria-label="Aumentar">+</button>
-                <a id="confImgLink" target="_blank" rel="noopener">Abrir</a>
-              </span>
-            </figcaption>
-            <div class="conf-img-scroll"><img id="confImg" alt="Packing list enviado"></div>
-          </figure>
-
-          <div class="tabela-wrap conf-tab">
-            <table class="tabela">
-              <thead>
-                <tr>
-                  <th>Situação</th>
-                  <th>Código</th>
-                  <th>Produto</th>
-                  <th class="n">Rolos<br>planilha</th>
-                  <th class="n">Rolos<br>sistema</th>
-                  <th class="n">Dif.<br>rolos</th>
-                  <th class="n">N.W.<br>planilha</th>
-                  <th class="n">Qtde atual<br>sistema</th>
-                  <th class="n">Divergência<br>(kg)</th>
-                  <th class="n">Ajustar<br>sistema para</th>
-                </tr>
-              </thead>
-              <tbody id="confCorpo"></tbody>
-            </table>
-          </div>
+        <div class="tabela-wrap conf-tab">
+          <table class="tabela">
+            <thead>
+              <tr>
+                <th>Situação</th>
+                <th>Código</th>
+                <th>Produto</th>
+                <th class="n">Rolos<br>planilha</th>
+                <th class="n">Rolos<br>sistema</th>
+                <th class="n col-dest">Dif.<br>rolos</th>
+                <th class="n">Peso na<br>planilha</th>
+                <th class="n">Peso no<br>sistema</th>
+                <th class="n col-dest">Divergência<br>(kg)</th>
+                <th class="n col-dest col-ajuste">Ajustar<br>sistema para</th>
+              </tr>
+            </thead>
+            <tbody id="confCorpo"></tbody>
+          </table>
         </div>
-        <p class="conf-legenda">Divergência = N.W. da planilha − Qtde atual do sistema. Positivo: o sistema está com menos peso que a planilha. Negativo: está com mais. "Ajustar sistema para" é o valor da planilha.</p>
+        <p class="conf-legenda">Divergência = Peso na planilha − Peso no sistema. Positivo: o sistema está com menos peso que a planilha. Negativo: está com mais. "Ajustar sistema para" é o peso da planilha.</p>
       </div>
     </section>
   </section>
 </main>
+
+<!-- Relatório de divergências (só aparece na impressão / PDF) -->
+<div id="relatorio" class="relatorio" aria-hidden="true"></div>
 
 <footer class="rodape-site" id="rodapeSite"></footer>
 <div id="toast" class="toast" role="status" hidden></div>

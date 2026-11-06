@@ -11,25 +11,55 @@
   const abertos = new Set();  // códigos com detalhe aberto
   let consultaId = 0;
 
-  // ---------- Recentes ----------
-  const CHAVE_REC = 'romaneio.recentes';
-  function lerRecentes() { try { return JSON.parse(localStorage.getItem(CHAVE_REC) || '[]'); } catch { return []; } }
-  function salvarRecente(n) {
-    const l = [n, ...lerRecentes().filter((x) => x !== n)].slice(0, 6);
-    try { localStorage.setItem(CHAVE_REC, JSON.stringify(l)); } catch {}
-    mostrarRecentes();
+  // ---------- Histórico ----------
+  const CHAVE_HIST = 'romaneio.historico';
+  const fmtData = (t) => new Date(t).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+  function lerHistorico() {
+    try {
+      const l = JSON.parse(localStorage.getItem(CHAVE_HIST) || '[]');
+      return Array.isArray(l) ? l.filter((x) => x && x.n) : [];
+    } catch { return []; }
   }
-  function mostrarRecentes() {
-    const l = lerRecentes();
-    const box = $('recentes');
-    box.hidden = !l.length;
-    box.innerHTML = l.length ? '<span>Recentes:</span>' + l.map((n) => `<button type="button" data-n="${esc(n)}">${esc(n)}</button>`).join('') : '';
+  function salvarHistorico(n) {
+    const l = [{ n, t: Date.now() }, ...lerHistorico().filter((x) => x.n !== n)].slice(0, 20);
+    try { localStorage.setItem(CHAVE_HIST, JSON.stringify(l)); } catch {}
+    mostrarHistorico();
   }
-  $('recentes').addEventListener('click', (e) => {
+  function mostrarHistorico() {
+    const l = lerHistorico();
+    $('historico').hidden = !l.length;
+    $('historicoQtd').textContent = l.length ? `(${l.length})` : '';
+    $('historicoLista').innerHTML = l.map((x) => `<li><button type="button" data-n="${esc(x.n)}"><span class="h-num">${esc(x.n)}</span><span class="h-data">${esc(fmtData(x.t))}</span></button></li>`).join('');
+    if (!l.length) abrirHistorico(false);
+  }
+  function abrirHistorico(abrir) {
+    $('historicoPainel').hidden = !abrir;
+    $('btnHistorico').setAttribute('aria-expanded', String(!!abrir));
+  }
+  $('btnHistorico').addEventListener('click', (e) => { e.stopPropagation(); abrirHistorico($('historicoPainel').hidden); });
+  $('historicoLista').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-n]');
     if (!b) return;
+    abrirHistorico(false);
     $('numero').value = b.dataset.n;
     buscar();
+  });
+  $('historicoLimpar').addEventListener('click', () => { try { localStorage.removeItem(CHAVE_HIST); } catch {} mostrarHistorico(); });
+  document.addEventListener('click', (e) => { if (!e.target.closest('#historico')) abrirHistorico(false); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') abrirHistorico(false); });
+
+  // ---------- Tema claro / escuro ----------
+  const CHAVE_TEMA = 'romaneio.tema';
+  function aplicarTema(t) {
+    document.documentElement.dataset.tema = t;
+    $('btnTemaTxt').textContent = t === 'escuro' ? 'Tema claro' : 'Tema escuro';
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', t === 'escuro' ? '#0a1222' : '#0f2340');
+  }
+  aplicarTema(document.documentElement.dataset.tema === 'escuro' ? 'escuro' : 'claro');
+  $('btnTema').addEventListener('click', () => {
+    const t = document.documentElement.dataset.tema === 'escuro' ? 'claro' : 'escuro';
+    try { localStorage.setItem(CHAVE_TEMA, t); } catch {}
+    aplicarTema(t);
   });
 
   // ---------- Mensagens ----------
@@ -49,7 +79,7 @@
   // ---------- Busca ----------
   async function buscar() {
     let numero = $('numero').value.trim().toUpperCase();
-    const filial = $('filial').value.trim();
+    const filial = '';
     if (!numero) { $('numero').focus(); return; }
     if (/^\d+$/.test(numero)) numero = numero.padStart(8, '0');
     $('numero').value = numero;
@@ -61,7 +91,7 @@
 
     const url = new URL(location.href);
     url.searchParams.set('r', numero);
-    filial ? url.searchParams.set('f', filial) : url.searchParams.delete('f');
+    url.searchParams.delete('f');
     history.replaceState(null, '', url);
 
     try {
@@ -73,11 +103,11 @@
       atual = j;
       abertos.clear();
       $('filtro').value = '';
-      salvarRecente(j.numero);
+      salvarHistorico(j.numero);
       if (!j.totalRolos) {
         atual = null;
         estado('inicio');
-        mostrar('erro', `Nenhum rolo encontrado no romaneio ${j.numero}${filial ? ' na filial ' + filial : ''}. Confira o número.`);
+        mostrar('erro', `Nenhum rolo encontrado no romaneio ${j.numero}. Confira o número.`);
         return;
       }
       if (j.aviso) mostrar('aviso', j.aviso);
@@ -85,7 +115,7 @@
       document.dispatchEvent(new CustomEvent('romaneio:carregado'));
       renderTudo();
       estado('resultado');
-      document.title = `Romaneio ${j.numero} · Consulta de Romaneio`;
+      document.title = `Romaneio ${j.numero} · Consulta de Romaneio - Importação`;
     } catch (e) {
       if (id !== consultaId) return;
       estado(atual ? 'resultado' : 'inicio');
@@ -112,11 +142,7 @@
     const j = atual;
     $('rNumero').textContent = j.numero;
     const quando = new Date(j.consultadoEm).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
-    $('rMeta').innerHTML = [
-      j.filial ? `Filial ${esc(j.filial)}` : '',
-      j.totalOPs ? `${int(j.totalOPs)} ${j.totalOPs === 1 ? 'ordem de produção' : 'ordens de produção'}` : '',
-      `Consultado em ${esc(quando)}`,
-    ].filter(Boolean).map((t) => `<span>${t}</span>`).join('');
+    $('rMeta').innerHTML = `<span>Consultado em ${esc(quando)}</span>`;
     $('sQtd').textContent = kg(j.totalQuantidade);
     $('sRolos').textContent = int(j.totalRolos);
     $('sProdutos').textContent = int(j.produtos.length);
@@ -220,7 +246,7 @@
     if (e.key === '/' && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) { e.preventDefault(); $('numero').select(); }
   });
 
-  $('rodapeSite').textContent = 'Dados da tabela SZ5 (rolos) e SB1 (produtos) do Protheus, consultados na hora da busca.';
+  $('rodapeSite').textContent = 'Consulta de Romaneio - Importação - Quatro K Textil LTDA';
 
   // ---------- Login ----------
   let pendente = null; // romaneio para buscar depois do login
@@ -231,6 +257,8 @@
     ['inicio', 'carregando', 'resultado'].forEach((id) => ($(id).hidden = true));
     mostrar('erro', ''); mostrar('aviso', '');
     $('login').hidden = false;
+    $('boasVindas').hidden = true;
+    reanimar($('formLogin'), 'entrada');
     mostrar('loginErro', msg || '');
     try { $('loginUsuario').value ||= localStorage.getItem(CHAVE_USER) || ''; } catch {}
     const direto = API.modo === 'direto';
@@ -239,15 +267,34 @@
     if (direto) $('loginServidor').value ||= API.servidorSalvo();
     (direto && !$('loginServidor').value ? $('loginServidor') : $('loginUsuario').value ? $('loginSenha') : $('loginUsuario')).focus();
   }
+  // Reinicia uma animação CSS no elemento
+  function reanimar(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
+  const semAnimacao = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const espera = (ms) => new Promise((ok) => setTimeout(ok, semAnimacao() ? 0 : ms));
+
+  // Login aprovado pelo formulário: o cartão sai, aparece "Bem-vindo" e a tela entra
+  async function entrarAnimado(usuario) {
+    $('formLogin').classList.add('saida');
+    await espera(260);
+    $('login').hidden = true;
+    $('formLogin').classList.remove('saida');
+    $('boasVindasNome').textContent = usuario;
+    $('boasVindas').hidden = false;
+    reanimar($('boasVindas'), 'mostrar');
+    await espera(1100);
+    $('boasVindas').hidden = true;
+    entrar(usuario);
+  }
+
   function entrar(usuario) {
     document.body.classList.add('logado');
+    reanimar(document.body, 'revelar');
     $('login').hidden = true;
     $('usuarioNome').textContent = usuario;
     $('usuarioBox').hidden = false;
     $('loginSenha').value = '';
-    mostrarRecentes();
+    mostrarHistorico();
     const q = new URLSearchParams(location.search);
-    if (q.get('f')) $('filial').value = q.get('f');
     const n = pendente || q.get('r');
     pendente = null;
     if (n) { $('numero').value = n; buscar(); }
@@ -264,7 +311,7 @@
       const j = r.j;
       if (!r.ok) { mostrar('loginErro', j.erro || 'Não foi possível entrar.'); $('loginSenha').select(); return; }
       try { localStorage.setItem(CHAVE_USER, usuario); } catch {}
-      entrar(j.usuario);
+      await entrarAnimado(j.usuario);
     } catch {
       mostrar('loginErro', API.modo === 'direto' ? 'Não foi possível entrar.' : 'O servidor do site não respondeu. Confira se ele está aberto.');
     } finally { $('btnEntrar').disabled = false; $('btnEntrar').textContent = 'Entrar'; }
