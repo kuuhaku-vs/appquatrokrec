@@ -118,6 +118,8 @@ body:not(.logado) .busca, body:not(.logado) .recentes { display: none !important
 .senha-wrap { position: relative; display: block; }
 .senha-wrap input { padding-right: 84px; }
 .senha-wrap button { position: absolute; right: 6px; top: 50%; translate: 0 -50%; border: 0; background: transparent; color: var(--accent); font: 600 12px var(--body); cursor: pointer; padding: 6px 8px; text-transform: none; letter-spacing: 0; }
+.login-campo small { font-size: 11.5px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--muted); }
+.alerta { white-space: pre-line; }
 .btn-entrar { height: 46px; border: 0; border-radius: 8px; background: var(--accent); color: var(--accent-fg); font-weight: 700; font-size: 15px; cursor: pointer; }
 .btn-entrar:disabled { opacity: .7; cursor: progress; }
 .login-nota { margin: 0; font-size: 12px; color: var(--muted); }

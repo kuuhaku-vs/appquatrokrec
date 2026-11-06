@@ -8,9 +8,41 @@ App interno para consultar romaneios no Protheus (TOTVS) e conferir com o packin
 - **Conferência com packing list**: envie o PDF, o print, a imagem ou a planilha do cliente e o app compara,
   produto a produto, os rolos e o **TOTAL N.W.** com o sistema, mostrando a divergência em kg.
 - Login com o **usuário e senha do Protheus** de cada pessoa, na própria tela do app.
+- Funciona de dois jeitos: **pelo site** (GitHub Pages, sem instalar nada) ou com **servidor próprio** (atalho na área de trabalho).
 - Abre como **aplicativo** pelo atalho na área de trabalho.
 
-## Instalar (Windows)
+## Usar pelo site (GitHub Pages)
+
+Endereço: **https://kuuhaku-vs.github.io/appquatrokrec/**
+
+1. Abra o endereço no Edge ou no Chrome.
+2. Na tela de login, informe o **endereço do Protheus** (o mesmo da genericQuery usado no Postman;
+   fica salvo no navegador), seu **usuário** e **senha** do Protheus.
+3. Para virar app: clique em **Instalar app** no topo (ou no ícone de instalar da barra de endereço).
+   Ele ganha atalho na área de trabalho e no menu Iniciar.
+
+Nesse modo não existe servidor no meio: o navegador consulta o Protheus direto. Para isso a TI
+precisa **liberar o CORS** no REST do Protheus, no `appserver.ini`, seção `[HTTPURI]` do REST
+([documentação TOTVS](https://tdn.totvs.com/x/i7PbCw)):
+
+```ini
+[HTTPURI]
+CORSEnable=1
+AllowOrigin=https://kuuhaku-vs.github.io
+```
+
+Depois de alterar, reinicie o serviço do REST. Também é preciso que:
+
+- o certificado HTTPS do Protheus seja válido (se for interno/autoassinado, abra o endereço do
+  Protheus numa aba e aceite o aviso antes de entrar);
+- o computador alcance o endereço do Protheus (rede da empresa, VPN ou acesso externo liberado).
+
+A senha fica só na aba aberta (some ao fechar), a não ser que a pessoa marque
+"Continuar conectado neste computador".
+
+Se o CORS não puder ser liberado, use o modo com servidor abaixo.
+
+## Instalar com servidor próprio (Windows)
 
 1. Instale o **Node.js** (versão LTS): https://nodejs.org
 2. Baixe este projeto (botão **Code → Download ZIP** no GitHub) e descompacte numa pasta fixa,
@@ -42,7 +74,7 @@ Um computador roda o servidor; os outros abrem o endereço **Na rede** que apare
 Para virar app nos outros computadores: no Edge, menu **⋯ → Aplicativos → Instalar este site como aplicativo**;
 no Chrome, menu **⋮ → Transmitir, salvar e compartilhar → Criar atalho** (marque *Abrir como janela*).
 
-## Login
+## Login (modo com servidor)
 
 - Cada pessoa entra com o **próprio usuário do Protheus**. O app testa o login no Protheus na hora.
 - A senha não é gravada em disco: fica só na memória do servidor enquanto a sessão estiver aberta.

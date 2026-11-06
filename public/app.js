@@ -65,8 +65,8 @@
     history.replaceState(null, '', url);
 
     try {
-      const resp = await fetch('/api/romaneio?' + new URLSearchParams({ numero, filial }));
-      const j = await resp.json().catch(() => ({ erro: 'Resposta inválida do servidor.' }));
+      const resp = await API.romaneio(numero, filial);
+      const j = resp.j;
       if (id !== consultaId) return;
       if (resp.status === 401 && j.login) { pendente = numero; mostrarLogin(j.erro); return; }
       if (!resp.ok) { estado(atual ? 'resultado' : 'inicio'); mostrar('erro', j.erro || 'Não foi possível consultar o romaneio.'); return; }
@@ -233,7 +233,11 @@
     $('login').hidden = false;
     mostrar('loginErro', msg || '');
     try { $('loginUsuario').value ||= localStorage.getItem(CHAVE_USER) || ''; } catch {}
-    ($('loginUsuario').value ? $('loginSenha') : $('loginUsuario')).focus();
+    const direto = API.modo === 'direto';
+    $('loginServidorBox').hidden = !direto;
+    $('lembrarBox').hidden = !direto;
+    if (direto) $('loginServidor').value ||= API.servidorSalvo();
+    (direto && !$('loginServidor').value ? $('loginServidor') : $('loginUsuario').value ? $('loginSenha') : $('loginUsuario')).focus();
   }
   function entrar(usuario) {
     document.body.classList.add('logado');
@@ -253,15 +257,16 @@
     e.preventDefault();
     const usuario = $('loginUsuario').value.trim(), senha = $('loginSenha').value;
     if (!usuario || !senha) return;
+    if (API.modo === 'direto' && !$('loginServidor').value.trim()) { mostrar('loginErro', 'Informe o endereço do Protheus.'); $('loginServidor').focus(); return; }
     $('btnEntrar').disabled = true; $('btnEntrar').textContent = 'Entrando…'; mostrar('loginErro', '');
     try {
-      const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ usuario, senha }) });
-      const j = await r.json().catch(() => ({}));
+      const r = await API.login(usuario, senha, $('loginServidor').value, $('lembrar').checked);
+      const j = r.j;
       if (!r.ok) { mostrar('loginErro', j.erro || 'Não foi possível entrar.'); $('loginSenha').select(); return; }
       try { localStorage.setItem(CHAVE_USER, usuario); } catch {}
       entrar(j.usuario);
     } catch {
-      mostrar('loginErro', 'O servidor do site não respondeu. Confira se ele está aberto.');
+      mostrar('loginErro', API.modo === 'direto' ? 'Não foi possível entrar.' : 'O servidor do site não respondeu. Confira se ele está aberto.');
     } finally { $('btnEntrar').disabled = false; $('btnEntrar').textContent = 'Entrar'; }
   });
   $('verSenha').addEventListener('click', () => {
@@ -269,7 +274,7 @@
     s.type = ver ? 'text' : 'password'; $('verSenha').textContent = ver ? 'Ocultar' : 'Mostrar'; s.focus();
   });
   $('btnSair').addEventListener('click', async () => {
-    try { await fetch('/api/logout', { method: 'POST' }); } catch {}
+    await API.logout();
     atual = null; window.romaneioAtual = null;
     document.dispatchEvent(new CustomEvent('romaneio:carregado'));
     history.replaceState(null, '', location.pathname);
@@ -281,9 +286,9 @@
   window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); pedidoInstalar = e; $('btnInstalar').hidden = false; });
   window.addEventListener('appinstalled', () => { $('btnInstalar').hidden = true; toast('App instalado. Procure "Consulta de Romaneio" na área de trabalho ou no menu Iniciar.'); });
   $('btnInstalar').addEventListener('click', async () => { if (!pedidoInstalar) return; pedidoInstalar.prompt(); await pedidoInstalar.userChoice; pedidoInstalar = null; $('btnInstalar').hidden = true; });
-  if ('serviceWorker' in navigator && window.isSecureContext) navigator.serviceWorker.register('/sw.js').catch(() => {});
+  if ('serviceWorker' in navigator && window.isSecureContext) navigator.serviceWorker.register('sw.js').catch(() => {});
 
-  fetch('/api/status').then((r) => r.json()).then((s) => {
+  API.status().then((s) => {
     if (!s.configurado) { mostrarLogin('O endereço do Protheus não foi configurado. Preencha PROTHEUS_URL no arquivo .env e reinicie o servidor.'); return; }
     s.logado ? entrar(s.usuario) : mostrarLogin();
   }).catch(() => mostrarLogin('O servidor do site não respondeu. Confira se ele está aberto.'));
