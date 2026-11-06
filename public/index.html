@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Consulta de Romaneio</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icone-192.png">
+<meta name="theme-color" content="#161b3d">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+
+<header class="topo">
+  <div class="topo-in">
+    <div class="marca">
+      <svg class="marca-ico" viewBox="0 0 32 32" aria-hidden="true"><use href="#ico-rolo"/></svg>
+      <div>
+        <div class="marca-nome">Consulta de Romaneio</div>
+        <div class="marca-sub">Rolos de malha por produto · Protheus</div>
+      </div>
+    </div>
+
+    <div class="usuario" id="usuarioBox" hidden>
+      <span class="usuario-nome"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span id="usuarioNome"></span></span>
+      <button type="button" id="btnInstalar" hidden>Instalar app</button>
+      <button type="button" id="btnSair">Sair</button>
+    </div>
+
+    <form id="busca" class="busca" autocomplete="off" role="search">
+      <label class="campo campo-rom">
+        <span>Romaneio</span>
+        <input id="numero" inputmode="numeric" maxlength="8" placeholder="00529749" required aria-describedby="atalho">
+      </label>
+      <label class="campo campo-fil">
+        <span>Filial</span>
+        <input id="filial" maxlength="10" placeholder="Todas">
+      </label>
+      <button id="btnBuscar" class="btn-buscar" type="submit">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <span>Buscar</span>
+      </button>
+    </form>
+    <div class="recentes" id="recentes" hidden></div>
+  </div>
+</header>
+
+<main class="conteudo">
+  <!-- Login -->
+  <section id="login" class="login" hidden>
+    <form id="formLogin" class="login-card" autocomplete="on">
+      <svg class="login-ico" viewBox="0 0 32 32" aria-hidden="true"><use href="#ico-rolo"/></svg>
+      <h1>Entrar</h1>
+      <p>Use o mesmo usuário e senha do Protheus.</p>
+      <label class="login-campo">Usuário
+        <input id="loginUsuario" name="username" autocomplete="username" required autocapitalize="none" spellcheck="false">
+      </label>
+      <label class="login-campo">Senha
+        <span class="senha-wrap">
+          <input id="loginSenha" name="password" type="password" autocomplete="current-password" required>
+          <button type="button" id="verSenha" aria-label="Mostrar senha">Mostrar</button>
+        </span>
+      </label>
+      <div id="loginErro" class="alerta alerta-erro" role="alert" hidden></div>
+      <button id="btnEntrar" class="btn-entrar" type="submit">Entrar</button>
+      <p class="login-nota">A senha fica só na memória do servidor enquanto você estiver conectado. A sessão encerra sozinha depois de algumas horas sem uso.</p>
+    </form>
+  </section>
+
+  <div id="erro" class="alerta alerta-erro" role="alert" hidden></div>
+  <div id="aviso" class="alerta alerta-aviso" hidden></div>
+
+  <!-- Estado inicial -->
+  <section id="inicio" class="inicio" hidden>
+    <svg class="inicio-ico" viewBox="0 0 32 32" aria-hidden="true"><use href="#ico-rolo"/></svg>
+    <h1>Digite o número do romaneio</h1>
+    <p>A consulta mostra cada produto do romaneio com a quantidade de rolos e a quantidade atual em quilos. Clique num produto para ver os rolos um a um.</p>
+    <p class="dica"><kbd>/</kbd> leva o cursor para a busca. Pode digitar sem os zeros à esquerda: <b>529749</b> vira <b>00529749</b>.</p>
+  </section>
+
+  <!-- Carregando -->
+  <section id="carregando" class="carregando" hidden aria-live="polite">
+    <div class="esqueleto esq-resumo"></div>
+    <div class="esqueleto esq-linha"></div><div class="esqueleto esq-linha"></div>
+    <div class="esqueleto esq-linha"></div><div class="esqueleto esq-linha"></div>
+    <p>Consultando o Protheus… romaneios grandes podem levar alguns segundos.</p>
+  </section>
+
+  <!-- Resultado -->
+  <section id="resultado" hidden>
+    <div class="cab-resultado">
+      <div>
+        <div class="rotulo">Romaneio</div>
+        <h1 class="num-romaneio" id="rNumero"></h1>
+        <div class="meta" id="rMeta"></div>
+      </div>
+    </div>
+
+    <div class="resumo">
+      <div class="stat stat-destaque">
+        <div class="rotulo">Qtde atual</div>
+        <div class="valor"><span id="sQtd"></span><small>kg</small></div>
+      </div>
+      <div class="stat">
+        <div class="rotulo">Rolos</div>
+        <div class="valor" id="sRolos"></div>
+      </div>
+      <div class="stat">
+        <div class="rotulo">Produtos</div>
+        <div class="valor" id="sProdutos"></div>
+      </div>
+      <div class="stat">
+        <div class="rotulo">Média por rolo</div>
+        <div class="valor"><span id="sMedia"></span><small>kg</small></div>
+      </div>
+    </div>
+
+    <div class="barra-ferr">
+      <label class="filtro">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+        <input id="filtro" placeholder="Filtrar por código ou descrição" aria-label="Filtrar produtos">
+      </label>
+      <div class="acoes">
+        <button class="btn-sec" id="btnExpandir" type="button">Abrir todos</button>
+        <button class="btn-sec" id="btnCopiar" type="button">Copiar para o Excel</button>
+        <button class="btn-sec" id="btnCsv" type="button">Baixar CSV</button>
+        <button class="btn-sec" id="btnImprimir" type="button">Imprimir</button>
+      </div>
+    </div>
+
+    <div class="tabela-wrap">
+      <table class="tabela">
+        <thead>
+          <tr>
+            <th class="col-seta" aria-label="Detalhe"></th>
+            <th data-ordem="codigo">Código</th>
+            <th data-ordem="descricao">Produto</th>
+            <th data-ordem="rolos" class="n">Rolos</th>
+            <th data-ordem="quantidade" class="n">Qtde atual (kg)</th>
+            <th class="col-part">% do romaneio</th>
+          </tr>
+        </thead>
+        <tbody id="corpo"></tbody>
+        <tfoot id="rodape"></tfoot>
+      </table>
+    </div>
+
+    <!-- Conferência com packing list -->
+    <section class="conf" id="conferencia" aria-labelledby="confTitulo">
+      <div class="conf-cab">
+        <div>
+          <h2 id="confTitulo">Conferir com packing list</h2>
+          <p>Compara, código por código, os rolos e o <b>TOTAL N.W.</b> da planilha com os rolos e a Qtde atual do sistema.</p>
+        </div>
+      </div>
+
+      <div class="conf-zona" id="confZona" tabindex="0" role="button" aria-describedby="confZonaDica">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-8 8"/></svg>
+        <div>
+          <strong>Cole o print com <kbd>Ctrl</kbd>+<kbd>V</kbd></strong>
+          <span id="confZonaDica">ou arraste aqui um <b>PDF</b>, uma imagem (PNG, JPG) ou a planilha (XLSX, CSV). PDF salvo pelo Excel é lido sem OCR, com os números exatos.</span>
+        </div>
+        <span class="btn-sec">Escolher arquivo</span>
+        <input type="file" id="confArquivo" accept="application/pdf,.pdf,image/*,.xlsx,.xls,.csv,.txt" hidden>
+      </div>
+
+      <div class="conf-prog" id="confProg" hidden>
+        <div class="conf-prog-barra"><i id="confProgBarra"></i></div>
+        <span id="confProgTxt"></span>
+      </div>
+      <div class="alerta alerta-erro" id="confErro" role="alert" hidden></div>
+
+      <div id="confResultado" hidden>
+        <div class="conf-veredito" id="confStatus"></div>
+        <div class="conf-totais" id="confTotais"></div>
+        <div class="alerta alerta-aviso" id="confAvisoTotal" hidden></div>
+
+        <div class="barra-ferr">
+          <div class="conf-opcoes">
+            <label class="chk"><input type="checkbox" id="confSoDiv"> Mostrar só o que precisa de ajuste</label>
+            <label class="tol">Tolerância <input id="confTol" value="0,05" inputmode="decimal" aria-label="Tolerância em kg"> kg</label>
+            <label class="chk"><input type="checkbox" id="confFixar"> Imagem ao lado</label>
+          </div>
+          <div class="acoes">
+            <button class="btn-sec" id="confCopiar" type="button">Copiar divergências</button>
+            <button class="btn-sec" id="confCsv" type="button">Baixar divergências (CSV)</button>
+            <button class="btn-sec" id="confLimpar" type="button">Nova conferência</button>
+          </div>
+        </div>
+        <p class="conf-origem" id="confOrigem"></p>
+
+        <div class="conf-layout" id="confLayout">
+          <figure class="conf-img" id="confImgBox" hidden>
+            <figcaption>
+              <span>Packing list enviado</span>
+              <span class="zoom">
+                <button type="button" id="confZoomMenos" aria-label="Diminuir">−</button>
+                <span id="confZoomTxt">100%</span>
+                <button type="button" id="confZoomMais" aria-label="Aumentar">+</button>
+                <a id="confImgLink" target="_blank" rel="noopener">Abrir</a>
+              </span>
+            </figcaption>
+            <div class="conf-img-scroll"><img id="confImg" alt="Packing list enviado"></div>
+          </figure>
+
+          <div class="tabela-wrap conf-tab">
+            <table class="tabela">
+              <thead>
+                <tr>
+                  <th>Situação</th>
+                  <th>Código</th>
+                  <th>Produto</th>
+                  <th class="n">Rolos<br>planilha</th>
+                  <th class="n">Rolos<br>sistema</th>
+                  <th class="n">Dif.<br>rolos</th>
+                  <th class="n">N.W.<br>planilha</th>
+                  <th class="n">Qtde atual<br>sistema</th>
+                  <th class="n">Divergência<br>(kg)</th>
+                  <th class="n">Ajustar<br>sistema para</th>
+                </tr>
+              </thead>
+              <tbody id="confCorpo"></tbody>
+            </table>
+          </div>
+        </div>
+        <p class="conf-legenda">Divergência = N.W. da planilha − Qtde atual do sistema. Positivo: o sistema está com menos peso que a planilha. Negativo: está com mais. "Ajustar sistema para" é o valor da planilha.</p>
+      </div>
+    </section>
+  </section>
+</main>
+
+<footer class="rodape-site" id="rodapeSite"></footer>
+<div id="toast" class="toast" role="status" hidden></div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="ico-rolo" viewBox="0 0 32 32">
+    <ellipse cx="9" cy="16" rx="5" ry="10" fill="none" stroke="currentColor" stroke-width="2"/>
+    <ellipse cx="9" cy="16" rx="1.6" ry="3.2" fill="currentColor"/>
+    <path d="M9 6h15c2.8 0 5 4.5 5 10s-2.2 10-5 10H9" fill="none" stroke="currentColor" stroke-width="2"/>
+    <path d="M14 9.5v13M19 8v16M24 7v18" stroke="currentColor" stroke-width="1.2" opacity=".45"/>
+  </symbol>
+</svg>
+
+<script src="/app.js"></script>
+<script src="/conferencia.js"></script>
+</body>
+</html>

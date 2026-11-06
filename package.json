@@ -1,0 +1,13 @@
+{
+  "name": "consulta-romaneio",
+  "version": "1.0.0",
+  "description": "Consulta de romaneio: produtos, rolos e quantidade atual (SZ5/SB1) via genericQuery do Protheus",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
