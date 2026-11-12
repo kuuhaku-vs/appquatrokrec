@@ -83,6 +83,13 @@ html[data-tema="escuro"] .ico-lua, html:not([data-tema="escuro"]) .ico-sol { dis
 
 .busca-area { display: flex; align-items: end; gap: 14px; flex-wrap: wrap; }
 .busca { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; width: min(100%, 560px); }
+.tipo-busca { grid-column: 1 / -1; display: inline-flex; justify-self: start; border: 1px solid var(--band-line); border-radius: var(--raio); overflow: hidden; }
+.tipo-busca label { cursor: pointer; }
+.tipo-busca input { position: absolute; opacity: 0; pointer-events: none; }
+.tipo-busca span { display: block; padding: 6px 16px; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--band-muted); transition: background-color .15s, color .15s; }
+.tipo-busca label + label span { border-left: 1px solid var(--band-line); }
+.tipo-busca input:checked + span { background: var(--band-fg); color: var(--band); }
+.tipo-busca input:focus-visible + span { box-shadow: inset 0 0 0 2px var(--accent); }
 .campo { display: grid; gap: 4px; min-width: 0; }
 .campo span { font-size: 11px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--band-muted); }
 .campo input {
@@ -117,6 +124,9 @@ html[data-tema="escuro"] .ico-lua, html:not([data-tema="escuro"]) .ico-sol { dis
 .historico-painel li button { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px; border: 0; background: none; padding: 8px 10px; border-radius: 4px; cursor: pointer; text-align: left; }
 .historico-painel li button:hover { background: var(--accent-soft); }
 .h-num { font: 600 15px var(--mono); letter-spacing: .04em; }
+#rMeta a { color: var(--accent); font-weight: 600; text-decoration: none; }
+#rMeta a:hover { text-decoration: underline; }
+.h-tipo { display: inline-block; min-width: 34px; margin-right: 8px; padding: 1px 5px; border-radius: 3px; background: var(--accent-soft); color: var(--accent); font: 700 10px var(--body); letter-spacing: .06em; text-align: center; vertical-align: 2px; }
 .h-data { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
 @keyframes cair { from { opacity: 0; transform: translateY(-4px); } }
 

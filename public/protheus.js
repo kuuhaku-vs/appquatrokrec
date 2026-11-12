@@ -93,25 +93,39 @@
     return Number.isFinite(n) ? n : 0;
   };
 
-  // Mesma regra do server.js
-  async function consultarDireto(numero, filial) {
+  // Mesma regra do server.js. tipo: 'romaneio' (Z5_ROMAN) ou 'op' (Z5_OP)
+  async function consultarDireto(numero, filial, tipo) {
+    const porOP = tipo === 'op';
     const a = auth();
     const base = normalizarUrl((ler(localStorage, CHAVE_URL) || URL_PADRAO));
     if (!a || !base) throw new ErroAPI('Entre com seu usuário do Protheus.', 401, true);
     numero = texto(numero).toUpperCase();
     filial = texto(filial);
-    if (!/^[A-Z0-9]{1,8}$/.test(numero)) throw new ErroAPI('Digite um número de romaneio válido, com até 8 dígitos.', 400);
-    if (/^\d+$/.test(numero)) numero = numero.padStart(8, '0');
+    if (porOP) {
+      if (!/^[A-Z0-9]{1,14}$/.test(numero)) throw new ErroAPI('Digite um número de OP válido, só com letras e números.', 400);
+      if (/^\d+$/.test(numero)) numero = numero.padStart(6, '0');
+    } else {
+      if (!/^[A-Z0-9]{1,8}$/.test(numero)) throw new ErroAPI('Digite um número de romaneio válido, com até 8 dígitos.', 400);
+      if (/^\d+$/.test(numero)) numero = numero.padStart(8, '0');
+    }
     if (!/^[A-Za-z0-9]{0,10}$/.test(filial)) throw new ErroAPI('Filial inválida.', 400);
 
     const C = CFG;
-    let where = `${C.campoRomaneio}='${numero}'`;
-    if (filial) where += ` AND ${C.campoFilial}='${filial}'`;
-    const campos = [C.campoFilial, C.campoProduto, C.campoQuantidade, C.campoNumero, C.campoSerie, C.campoOP, C.campoPartida].join(',');
+    // OP: busca pelo começo do número, assim "012345" traz todos os itens/sequências (01234501001...)
+    const sufixo = filial ? ` AND ${C.campoFilial}='${filial}'` : '';
+    const where = (porOP ? `${C.campoOP} LIKE '${numero}%'` : `${C.campoRomaneio}='${numero}'`) + sufixo;
+    const campos = [C.campoFilial, C.campoRomaneio, C.campoProduto, C.campoQuantidade, C.campoNumero, C.campoSerie, C.campoOP, C.campoPartida].join(',');
     const t0 = Date.now();
-    const rolos = await buscarTudo(base, a.basic, C.tabela, campos, where);
+    let rolos;
+    try {
+      rolos = await buscarTudo(base, a.basic, C.tabela, campos, where);
+    } catch (e) {
+      // Se o Protheus não aceitar LIKE, tenta a OP exata
+      if (!porOP || e.login || e.status === 0) throw e;
+      rolos = await buscarTudo(base, a.basic, C.tabela, campos, `${C.campoOP}='${numero}'` + sufixo);
+    }
 
-    const grupos = new Map(), filiais = new Set(), ops = new Set();
+    const grupos = new Map(), filiais = new Set(), ops = new Set(), romaneios = new Set();
     for (const r of rolos) {
       const cod = texto(campo(r, C.campoProduto));
       let g = grupos.get(cod);
@@ -120,7 +134,8 @@
       g.rolos += 1; g.quantidade += qtd;
       const op = texto(campo(r, C.campoOP)); if (op) ops.add(op);
       const fil = texto(campo(r, C.campoFilial)); if (fil) filiais.add(fil);
-      g.itens.push({ numero: texto(campo(r, C.campoNumero)), serie: texto(campo(r, C.campoSerie)), op, partida: texto(campo(r, C.campoPartida)), quantidade: +qtd.toFixed(3) });
+      const rom = texto(campo(r, C.campoRomaneio)); if (rom) romaneios.add(rom);
+      g.itens.push({ numero: texto(campo(r, C.campoNumero)), serie: texto(campo(r, C.campoSerie)), romaneio: rom, op, partida: texto(campo(r, C.campoPartida)), quantidade: +qtd.toFixed(3) });
     }
     let aviso = '';
     const codigos = [...grupos.keys()].filter(Boolean);
@@ -141,6 +156,7 @@
       .map((g) => ({ ...g, quantidade: +g.quantidade.toFixed(3), itens: g.itens.sort((x, y) => x.numero.localeCompare(y.numero, 'pt-BR', { numeric: true })) }))
       .sort((x, y) => x.codigo.localeCompare(y.codigo, 'pt-BR', { numeric: true }));
     return {
+      tipo: porOP ? 'op' : 'romaneio', romaneios: [...romaneios].sort(),
       numero, filial: filial || [...filiais].join(', '), totalRolos: rolos.length,
       totalQuantidade: +produtos.reduce((s, p) => s + p.quantidade, 0).toFixed(3),
       totalOPs: ops.size, produtos, aviso, consultadoEm: new Date().toISOString(), tempoMs: Date.now() - t0,
@@ -204,13 +220,16 @@
       gravar(localStorage, CHAVE_AUTH, null);
     },
 
-    async romaneio(numero, filial) {
+    romaneio(numero, filial) { return this.consultar('romaneio', numero, filial); },
+    op(numero, filial) { return this.consultar('op', numero, filial); },
+
+    async consultar(tipo, numero, filial) {
       if ((await detectarModo()) === 'servidor') {
-        const r = await fetch('api/romaneio?' + new URLSearchParams({ numero, filial }));
+        const r = await fetch(`api/${tipo === 'op' ? 'op' : 'romaneio'}?` + new URLSearchParams({ numero, filial }));
         return resposta(r.ok, r.status, await r.json().catch(() => ({ erro: 'Resposta inválida do servidor.' })));
       }
       try {
-        return resposta(true, 200, await consultarDireto(numero, filial));
+        return resposta(true, 200, await consultarDireto(numero, filial, tipo));
       } catch (e) {
         if (e.login) { gravar(sessionStorage, CHAVE_AUTH, null); gravar(localStorage, CHAVE_AUTH, null); }
         return resposta(false, e.status || 502, { erro: e.message, login: !!e.login });

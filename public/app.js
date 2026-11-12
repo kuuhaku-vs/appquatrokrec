@@ -17,11 +17,11 @@
   function lerHistorico() {
     try {
       const l = JSON.parse(localStorage.getItem(CHAVE_HIST) || '[]');
-      return Array.isArray(l) ? l.filter((x) => x && x.n) : [];
+      return Array.isArray(l) ? l.filter((x) => x && x.n).map((x) => ({ ...x, tipo: x.tipo === 'op' ? 'op' : 'romaneio' })) : [];
     } catch { return []; }
   }
-  function salvarHistorico(n) {
-    const l = [{ n, t: Date.now() }, ...lerHistorico().filter((x) => x.n !== n)].slice(0, 20);
+  function salvarHistorico(n, tipo) {
+    const l = [{ n, tipo, t: Date.now() }, ...lerHistorico().filter((x) => !(x.n === n && x.tipo === tipo))].slice(0, 20);
     try { localStorage.setItem(CHAVE_HIST, JSON.stringify(l)); } catch {}
     mostrarHistorico();
   }
@@ -29,7 +29,7 @@
     const l = lerHistorico();
     $('historico').hidden = !l.length;
     $('historicoQtd').textContent = l.length ? `(${l.length})` : '';
-    $('historicoLista').innerHTML = l.map((x) => `<li><button type="button" data-n="${esc(x.n)}"><span class="h-num">${esc(x.n)}</span><span class="h-data">${esc(fmtData(x.t))}</span></button></li>`).join('');
+    $('historicoLista').innerHTML = l.map((x) => `<li><button type="button" data-n="${esc(x.n)}" data-tipo="${x.tipo}"><span class="h-num"><span class="h-tipo">${x.tipo === 'op' ? 'OP' : 'ROM'}</span>${esc(x.n)}</span><span class="h-data">${esc(fmtData(x.t))}</span></button></li>`).join('');
     if (!l.length) abrirHistorico(false);
   }
   function abrirHistorico(abrir) {
@@ -41,6 +41,7 @@
     const b = e.target.closest('button[data-n]');
     if (!b) return;
     abrirHistorico(false);
+    definirTipo(b.dataset.tipo);
     $('numero').value = b.dataset.n;
     buscar();
   });
@@ -76,12 +77,34 @@
     $('resultado').hidden = qual !== 'resultado';
   }
 
+  // ---------- Tipo de busca: romaneio ou OP ----------
+  const TIPOS = {
+    romaneio: { nome: 'Romaneio', artigo: 'o romaneio', de: 'do romaneio', digitos: 8, max: 8, param: 'r', placeholder: 'Digite o número do romaneio...' },
+    op: { nome: 'OP', artigo: 'a OP', de: 'da OP', digitos: 6, max: 14, param: 'op', placeholder: 'Digite o número da OP...' },
+  };
+  const tipoAtual = () => (document.querySelector('input[name="tipoBusca"]:checked')?.value === 'op' ? 'op' : 'romaneio');
+  function definirTipo(tipo) {
+    tipo = tipo === 'op' ? 'op' : 'romaneio';
+    const T = TIPOS[tipo];
+    document.querySelector(`input[name="tipoBusca"][value="${tipo}"]`).checked = true;
+    $('numero').maxLength = T.max;
+    $('numero').placeholder = T.placeholder;
+    $('numero').setAttribute('aria-label', `Número ${T.de}`);
+  }
+  document.querySelectorAll('input[name="tipoBusca"]').forEach((r) => r.addEventListener('change', () => {
+    definirTipo(tipoAtual());
+    $('numero').value = '';
+    $('numero').focus();
+  }));
+  definirTipo(tipoAtual()); // o navegador pode restaurar a opção marcada ao recarregar
+
   // ---------- Busca ----------
   async function buscar() {
+    const tipo = tipoAtual(), T = TIPOS[tipo];
     let numero = $('numero').value.trim().toUpperCase();
     const filial = '';
     if (!numero) { $('numero').focus(); return; }
-    if (/^\d+$/.test(numero)) numero = numero.padStart(8, '0');
+    if (/^\d+$/.test(numero)) numero = numero.padStart(T.digitos, '0');
     $('numero').value = numero;
 
     const id = ++consultaId;
@@ -90,32 +113,38 @@
     estado('carregando');
 
     const url = new URL(location.href);
-    url.searchParams.set('r', numero);
+    url.searchParams.delete('r'); url.searchParams.delete('op');
+    url.searchParams.set(T.param, numero);
     url.searchParams.delete('f');
     history.replaceState(null, '', url);
 
     try {
-      const resp = await API.romaneio(numero, filial);
+      const resp = tipo === 'op' ? await API.op(numero, filial) : await API.romaneio(numero, filial);
       const j = resp.j;
       if (id !== consultaId) return;
-      if (resp.status === 401 && j.login) { pendente = numero; mostrarLogin(j.erro); return; }
-      if (!resp.ok) { estado(atual ? 'resultado' : 'inicio'); mostrar('erro', j.erro || 'Não foi possível consultar o romaneio.'); return; }
+      if (resp.status === 401 && j.login) { pendente = { n: numero, tipo }; mostrarLogin(j.erro); return; }
+      if (!resp.ok) { estado(atual ? 'resultado' : 'inicio'); mostrar('erro', j.erro || `Não foi possível consultar ${T.artigo}.`); return; }
+      j.tipo = tipo;
       atual = j;
       abertos.clear();
       $('filtro').value = '';
-      salvarHistorico(j.numero);
       if (!j.totalRolos) {
         atual = null;
+        window.romaneioAtual = null;
+        document.dispatchEvent(new CustomEvent('romaneio:carregado'));
         estado('inicio');
-        mostrar('erro', `Nenhum rolo encontrado no romaneio ${j.numero}. Confira o número.`);
+        mostrar('erro', tipo === 'op' ? `Nenhum rolo encontrado para a OP ${j.numero}. Confira o número.` : `Nenhum rolo encontrado no romaneio ${j.numero}. Confira o número.`);
         return;
       }
+      salvarHistorico(j.numero, tipo);
       if (j.aviso) mostrar('aviso', j.aviso);
-      window.romaneioAtual = j;
+      // A conferência com packing list vale só para romaneio
+      window.romaneioAtual = tipo === 'romaneio' ? j : null;
+      $('conferencia').hidden = tipo !== 'romaneio';
       document.dispatchEvent(new CustomEvent('romaneio:carregado'));
       renderTudo();
       estado('resultado');
-      document.title = `Romaneio ${j.numero} · Consulta de Romaneio - Importação`;
+      document.title = `${T.nome} ${j.numero} · Consulta de Romaneio - Importação`;
     } catch (e) {
       if (id !== consultaId) return;
       estado(atual ? 'resultado' : 'inicio');
@@ -140,9 +169,14 @@
 
   function renderTudo() {
     const j = atual;
+    const porOP = j.tipo === 'op';
+    $('rRotulo').textContent = TIPOS[j.tipo].nome;
     $('rNumero').textContent = j.numero;
+    $('thPart').textContent = porOP ? '% da OP' : '% do romaneio';
     const quando = new Date(j.consultadoEm).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
-    $('rMeta').innerHTML = `<span>Consultado em ${esc(quando)}</span>`;
+    const roms = porOP ? (j.romaneios || []) : [];
+    $('rMeta').innerHTML = (roms.length ? `<span>${roms.length === 1 ? 'Romaneio' : `${roms.length} romaneios`}: ${roms.map((r) => `<a href="?r=${encodeURIComponent(r)}" data-rom="${esc(r)}">${esc(r)}</a>`).join(', ')}</span> · ` : '')
+      + `<span>Consultado em ${esc(quando)}</span>`;
     $('sQtd').textContent = kg(j.totalQuantidade);
     $('sRolos').textContent = int(j.totalRolos);
     $('sProdutos').textContent = int(j.produtos.length);
@@ -154,6 +188,7 @@
 
   function renderTabela() {
     const lista = produtosVisiveis();
+    const porOP = atual.tipo === 'op';
     const total = atual.totalQuantidade || 1;
     const maior = Math.max(...atual.produtos.map((p) => p.quantidade), 1);
 
@@ -181,8 +216,8 @@
       </tr>`;
       if (aberto) {
         h += `<tr class="detalhe"><td colspan="6"><div style="overflow-x:auto"><table class="rolos">
-          <thead><tr><th>#</th><th>Rolo</th><th>Série</th><th>OP</th><th>Partida</th><th class="n">Qtde atual (kg)</th></tr></thead><tbody>
-          ${p.itens.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(r.numero)}</td><td>${esc(r.serie)}</td><td>${esc(r.op)}</td><td>${esc(r.partida)}</td><td class="n">${kg(r.quantidade)}</td></tr>`).join('')}
+          <thead><tr><th>#</th><th>Rolo</th><th>Série</th>${porOP ? '<th>Romaneio</th>' : ''}<th>OP</th><th>Partida</th><th class="n">Qtde atual (kg)</th></tr></thead><tbody>
+          ${p.itens.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(r.numero)}</td><td>${esc(r.serie)}</td>${porOP ? `<td>${esc(r.romaneio)}</td>` : ''}<td>${esc(r.op)}</td><td>${esc(r.partida)}</td><td class="n">${kg(r.quantidade)}</td></tr>`).join('')}
           </tbody></table></div></td></tr>`;
       }
     }
@@ -191,7 +226,7 @@
     const filtrado = lista.length !== atual.produtos.length;
     const sRolos = lista.reduce((s, p) => s + p.rolos, 0);
     const sQtd = lista.reduce((s, p) => s + p.quantidade, 0);
-    $('rodape').innerHTML = lista.length ? `<tr><td></td><td colspan="2">${filtrado ? `Total filtrado (${lista.length} de ${atual.produtos.length})` : 'Total do romaneio'}</td>
+    $('rodape').innerHTML = lista.length ? `<tr><td></td><td colspan="2">${filtrado ? `Total filtrado (${lista.length} de ${atual.produtos.length})` : `Total ${TIPOS[atual.tipo].de}`}</td>
       <td class="n">${int(sRolos)}</td><td class="n">${kg(sQtd)}</td><td class="col-part"><span class="part-num" style="width:auto">${pct((sQtd / total) * 100)}</span></td></tr>` : '';
     $('btnExpandir').textContent = abertos.size && lista.every((p) => abertos.has(p.codigo)) ? 'Fechar todos' : 'Abrir todos';
   }
@@ -209,6 +244,12 @@
     renderTabela();
   });
   $('filtro').addEventListener('input', renderTabela);
+  // Na busca por OP, clicar num romaneio do cabeçalho abre esse romaneio
+  $('rMeta').addEventListener('click', (e) => {
+    const a = e.target.closest('a[data-rom]'); if (!a) return;
+    e.preventDefault();
+    definirTipo('romaneio'); $('numero').value = a.dataset.rom; buscar();
+  });
   $('btnExpandir').addEventListener('click', () => {
     const lista = produtosVisiveis();
     const todos = lista.every((p) => abertos.has(p.codigo));
@@ -219,7 +260,7 @@
   // ---------- Exportar ----------
   const numTxt = (n) => n.toLocaleString('pt-BR', { useGrouping: false, minimumFractionDigits: 2, maximumFractionDigits: 3 });
   function linhasExport() {
-    return [['Romaneio', 'Código', 'Produto', 'Rolos', 'Qtde atual (kg)'],
+    return [[TIPOS[atual.tipo].nome, 'Código', 'Produto', 'Rolos', 'Qtde atual (kg)'],
       ...produtosVisiveis().map((p) => [atual.numero, p.codigo, p.descricao, String(p.rolos), numTxt(p.quantidade)])];
   }
   $('btnCopiar').addEventListener('click', async () => {
@@ -235,7 +276,7 @@
     const csv = linhasExport().map((l) => l.map((c) => /[;"\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c).join(';')).join('\r\n');
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob); a.download = `romaneio-${atual.numero}.csv`;
+    a.href = URL.createObjectURL(blob); a.download = `${atual.tipo === 'op' ? 'op' : 'romaneio'}-${atual.numero}.csv`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   });
@@ -249,7 +290,7 @@
   $('rodapeSite').textContent = 'Consulta de Romaneio - Importação - Quatro K Textil LTDA';
 
   // ---------- Login ----------
-  let pendente = null; // romaneio para buscar depois do login
+  let pendente = null; // consulta { n, tipo } para refazer depois do login
   const CHAVE_USER = 'romaneio.usuario';
   function mostrarLogin(msg) {
     document.body.classList.remove('logado');
@@ -295,9 +336,9 @@
     $('loginSenha').value = '';
     mostrarHistorico();
     const q = new URLSearchParams(location.search);
-    const n = pendente || q.get('r');
+    const alvo = pendente || (q.get('op') ? { n: q.get('op'), tipo: 'op' } : q.get('r') ? { n: q.get('r'), tipo: 'romaneio' } : null);
     pendente = null;
-    if (n) { $('numero').value = n; buscar(); }
+    if (alvo) { definirTipo(alvo.tipo); $('numero').value = alvo.n; buscar(); }
     else { estado(atual ? 'resultado' : 'inicio'); $('numero').focus(); }
   }
   $('formLogin').addEventListener('submit', async (e) => {

@@ -2,6 +2,9 @@
 
 App interno para consultar romaneios no Protheus (TOTVS) e conferir com o packing list.
 
+- Busque por **romaneio** ou por **OP** (ordem de produção, `Z5_OP`): escolha o tipo acima do campo.
+  Na busca por OP, digitar só o número (ex.: `012345`) traz todos os itens/sequências da OP e mostra
+  em quais romaneios os rolos estão.
 - Digite o número do romaneio e veja cada **produto** com a **quantidade de rolos** e a
   **quantidade atual em kg** (`Z5_PESOATU`), com os totais. Clique num produto para ver os rolos
   um a um (número, série, OP, partida e quantidade).
@@ -130,7 +133,7 @@ O navegador conversa só com o `server.js`, que faz as consultas no Protheus com
 | SZ5 | `Z5_FILIAL, Z5_PROD, Z5_PESOATU, Z5_NUMERO, Z5_SERIE, Z5_OP, Z5_PARTIDA` filtrado por `Z5_ROMAN` | rolos do romaneio |
 | SB1 | `B1_COD, B1_DESC` | descrição dos produtos |
 
-Rotas: `GET /api/romaneio?numero=…&filial=…`, `GET /api/campos` (lista os campos da SZ5 pelo SX3),
+Rotas: `GET /api/romaneio?numero=…&filial=…`, `GET /api/op?numero=…&filial=…` (filtra por `Z5_OP`), `GET /api/campos` (lista os campos da SZ5 pelo SX3),
 `GET /api/status`, `POST /api/login`, `POST /api/logout`.
 
 Sem dependências: só Node.js 18+.

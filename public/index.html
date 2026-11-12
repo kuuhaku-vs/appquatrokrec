@@ -51,9 +51,12 @@
 
     <div class="busca-area">
       <form id="busca" class="busca" autocomplete="off" role="search">
+        <div class="tipo-busca" role="radiogroup" aria-label="Buscar por">
+          <label><input type="radio" name="tipoBusca" value="romaneio" checked><span>Romaneio</span></label>
+          <label><input type="radio" name="tipoBusca" value="op"><span>OP</span></label>
+        </div>
         <label class="campo campo-rom">
-          <span>Romaneio</span>
-          <input id="numero" inputmode="numeric" maxlength="8" placeholder="Digite o número..." required>
+          <input id="numero" inputmode="numeric" maxlength="8" placeholder="Digite o número do romaneio..." aria-label="Número do romaneio" required>
         </label>
         <button id="btnBuscar" class="btn-buscar" type="submit">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -66,7 +69,7 @@
           Ver histórico <span class="historico-qtd" id="historicoQtd"></span>
         </button>
         <div class="historico-painel" id="historicoPainel" hidden>
-          <div class="historico-cab"><span>Romaneios consultados</span><button type="button" id="historicoLimpar">Limpar</button></div>
+          <div class="historico-cab"><span>Consultas recentes</span><button type="button" id="historicoLimpar">Limpar</button></div>
           <ul id="historicoLista"></ul>
         </div>
       </div>
@@ -120,8 +123,8 @@
   <!-- Estado inicial -->
   <section id="inicio" class="inicio" hidden>
     <span class="inicio-selo"><svg viewBox="0 0 32 32" aria-hidden="true"><use href="#ico-rolo"/></svg></span>
-    <h1>Digite o número do romaneio</h1>
-    <p>A consulta mostra cada produto do romaneio com a quantidade de rolos e o peso atual em quilos. Clique num produto para ver os rolos um a um.</p>
+    <h1>Digite o número do romaneio ou da OP</h1>
+    <p>Escolha <b>Romaneio</b> ou <b>OP</b> acima do campo. A consulta mostra cada produto com a quantidade de rolos e o peso atual em quilos. Clique num produto para ver os rolos um a um.</p>
   </section>
 
   <!-- Carregando -->
@@ -129,14 +132,14 @@
     <div class="esqueleto esq-resumo"></div>
     <div class="esqueleto esq-linha"></div><div class="esqueleto esq-linha"></div>
     <div class="esqueleto esq-linha"></div><div class="esqueleto esq-linha"></div>
-    <p>Consultando o Protheus… romaneios grandes podem levar alguns segundos.</p>
+    <p>Consultando o Protheus… consultas grandes podem levar alguns segundos.</p>
   </section>
 
   <!-- Resultado -->
   <section id="resultado" hidden>
     <div class="cab-resultado">
       <div>
-        <div class="rotulo">Romaneio</div>
+        <div class="rotulo" id="rRotulo">Romaneio</div>
         <h1 class="num-romaneio" id="rNumero"></h1>
         <div class="meta" id="rMeta"></div>
       </div>
@@ -183,7 +186,7 @@
             <th data-ordem="descricao">Produto</th>
             <th data-ordem="rolos" class="n">Rolos</th>
             <th data-ordem="quantidade" class="n">Qtde atual (kg)</th>
-            <th class="col-part">% do romaneio</th>
+            <th class="col-part" id="thPart">% do romaneio</th>
           </tr>
         </thead>
         <tbody id="corpo"></tbody>

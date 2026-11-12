@@ -154,25 +154,40 @@ const num = (v) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-// ---------- Regras do romaneio ----------
-async function consultarRomaneio(params) {
+// ---------- Regras da consulta: por romaneio (Z5_ROMAN) ou por OP (Z5_OP) ----------
+async function consultarRomaneio(params, tipo) {
+  const porOP = tipo === 'op';
   let numero = texto(params.get('numero')).toUpperCase();
   const filial = texto(params.get('filial'));
-  if (!/^[A-Z0-9]{1,8}$/.test(numero)) return { status: 400, dados: { erro: 'Digite um número de romaneio válido, com até 8 dígitos.' } };
-  if (/^\d+$/.test(numero)) numero = numero.padStart(8, '0');
+  if (porOP) {
+    if (!/^[A-Z0-9]{1,14}$/.test(numero)) return { status: 400, dados: { erro: 'Digite um número de OP válido, só com letras e números.' } };
+    if (/^\d+$/.test(numero)) numero = numero.padStart(6, '0');
+  } else {
+    if (!/^[A-Z0-9]{1,8}$/.test(numero)) return { status: 400, dados: { erro: 'Digite um número de romaneio válido, com até 8 dígitos.' } };
+    if (/^\d+$/.test(numero)) numero = numero.padStart(8, '0');
+  }
   if (!/^[A-Za-z0-9]{0,10}$/.test(filial)) return { status: 400, dados: { erro: 'Filial inválida.' } };
 
-  let where = `${CONFIG.campoRomaneio}='${numero}'`;
-  if (filial) where += ` AND ${CONFIG.campoFilial}='${filial}'`;
   const C = CONFIG;
-  const campos = [C.campoFilial, C.campoProduto, C.campoQuantidade, C.campoNumero, C.campoSerie, C.campoOP, C.campoPartida].join(',');
+  // OP: busca pelo começo do número, assim "012345" traz todos os itens/sequências (01234501001...)
+  const sufixo = filial ? ` AND ${C.campoFilial}='${filial}'` : '';
+  const where = (porOP ? `${C.campoOP} LIKE '${numero}%'` : `${C.campoRomaneio}='${numero}'`) + sufixo;
+  const campos = [C.campoFilial, C.campoRomaneio, C.campoProduto, C.campoQuantidade, C.campoNumero, C.campoSerie, C.campoOP, C.campoPartida].join(',');
 
   const t0 = Date.now();
-  const rolos = await buscarTudo(C.tabela, campos, where);
+  let rolos;
+  try {
+    rolos = await buscarTudo(C.tabela, campos, where);
+  } catch (e) {
+    // Se o Protheus não aceitar LIKE, tenta a OP exata
+    if (!porOP || !(e instanceof ErroProtheus) || e.status === 401) throw e;
+    rolos = await buscarTudo(C.tabela, campos, `${C.campoOP}='${numero}'` + sufixo);
+  }
 
   const grupos = new Map();
   const filiais = new Set();
   const ops = new Set();
+  const romaneios = new Set();
   for (const r of rolos.itens) {
     const cod = texto(ler(r, C.campoProduto));
     let g = grupos.get(cod);
@@ -184,9 +199,12 @@ async function consultarRomaneio(params) {
     if (op) ops.add(op);
     const fil = texto(ler(r, C.campoFilial));
     if (fil) filiais.add(fil);
+    const rom = texto(ler(r, C.campoRomaneio));
+    if (rom) romaneios.add(rom);
     g.itens.push({
       numero: texto(ler(r, C.campoNumero)),
       serie: texto(ler(r, C.campoSerie)),
+      romaneio: rom,
       op,
       partida: texto(ler(r, C.campoPartida)),
       quantidade: +qtd.toFixed(3),
@@ -220,6 +238,8 @@ async function consultarRomaneio(params) {
   return {
     status: 200,
     dados: {
+      tipo: porOP ? 'op' : 'romaneio',
+      romaneios: [...romaneios].sort(),
       numero,
       filial: filial || [...filiais].join(', '),
       totalRolos: rolos.itens.length,
@@ -307,8 +327,9 @@ const servidor = http.createServer(async (req, res) => {
       if (!s) return json(res, 401, { erro: 'Sua sessão expirou. Entre de novo.', login: true });
       const cred = { usuario: s.usuario, senha: s.senha };
       try {
-        if (u.pathname === '/api/romaneio') {
-          const { status, dados } = await credencial.run(cred, () => consultarRomaneio(u.searchParams));
+        if (u.pathname === '/api/romaneio' || u.pathname === '/api/op') {
+          const tipo = u.pathname === '/api/op' ? 'op' : 'romaneio';
+          const { status, dados } = await credencial.run(cred, () => consultarRomaneio(u.searchParams, tipo));
           return json(res, status, dados);
         }
         if (u.pathname === '/api/campos') return json(res, 200, await credencial.run(cred, listarCampos));
