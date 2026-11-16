@@ -7,7 +7,7 @@ App interno para consultar romaneios no Protheus (TOTVS) e conferir com o packin
   em quais romaneios os rolos estão.
 - Digite o número do romaneio e veja cada **produto** com a **quantidade de rolos** e a
   **quantidade atual em kg** (`Z5_PESOATU`), com os totais. Clique num produto para ver os rolos
-  um a um (número, série, OP, partida e quantidade).
+  um a um (RG — série + número do rolo —, OP, partida, **endereço** e quantidade).
 - **Conferência com packing list**: envie o PDF, o print, a imagem ou a planilha do cliente e o app compara,
   produto a produto, os rolos e o **TOTAL N.W.** com o sistema, mostrando a divergência em kg.
 - Login com o **usuário e senha do Protheus** de cada pessoa, na própria tela do app.
