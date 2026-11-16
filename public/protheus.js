@@ -12,7 +12,7 @@
   const CFG = {
     tabela: 'SZ5', campoFilial: 'Z5_FILIAL', campoRomaneio: 'Z5_ROMAN', campoProduto: 'Z5_PROD',
     campoQuantidade: 'Z5_PESOATU', campoNumero: 'Z5_NUMERO', campoSerie: 'Z5_SERIE', campoOP: 'Z5_OP',
-    campoPartida: 'Z5_PARTIDA', tamanhoPagina: 200, maxPaginas: 100,
+    campoPartida: 'Z5_PARTIDA', campoEndereco: 'Z5_ENDEREC', tamanhoPagina: 200, maxPaginas: 100,
   };
 
   let modo = null; // 'servidor' | 'direto'
@@ -114,7 +114,7 @@
     // OP: busca pelo começo do número, assim "012345" traz todos os itens/sequências (01234501001...)
     const sufixo = filial ? ` AND ${C.campoFilial}='${filial}'` : '';
     const where = (porOP ? `${C.campoOP} LIKE '${numero}%'` : `${C.campoRomaneio}='${numero}'`) + sufixo;
-    const campos = [C.campoFilial, C.campoRomaneio, C.campoProduto, C.campoQuantidade, C.campoNumero, C.campoSerie, C.campoOP, C.campoPartida].join(',');
+    const campos = [C.campoFilial, C.campoRomaneio, C.campoProduto, C.campoQuantidade, C.campoNumero, C.campoSerie, C.campoOP, C.campoPartida, C.campoEndereco].join(',');
     const t0 = Date.now();
     let rolos;
     try {
@@ -135,7 +135,8 @@
       const op = texto(campo(r, C.campoOP)); if (op) ops.add(op);
       const fil = texto(campo(r, C.campoFilial)); if (fil) filiais.add(fil);
       const rom = texto(campo(r, C.campoRomaneio)); if (rom) romaneios.add(rom);
-      g.itens.push({ numero: texto(campo(r, C.campoNumero)), serie: texto(campo(r, C.campoSerie)), romaneio: rom, op, partida: texto(campo(r, C.campoPartida)), quantidade: +qtd.toFixed(3) });
+      const numero = texto(campo(r, C.campoNumero)), serie = texto(campo(r, C.campoSerie));
+      g.itens.push({ numero, serie, rg: serie + numero, endereco: texto(campo(r, C.campoEndereco)), romaneio: rom, op, partida: texto(campo(r, C.campoPartida)), quantidade: +qtd.toFixed(3) });
     }
     let aviso = '';
     const codigos = [...grupos.keys()].filter(Boolean);

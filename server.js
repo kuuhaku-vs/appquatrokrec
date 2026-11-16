@@ -45,6 +45,7 @@ const CONFIG = {
   campoSerie: 'Z5_SERIE',
   campoOP: 'Z5_OP',
   campoPartida: 'Z5_PARTIDA',
+  campoEndereco: 'Z5_ENDEREC',
   tamanhoPagina: 200,
   maxPaginas: 100,
 };
@@ -172,7 +173,7 @@ async function consultarRomaneio(params, tipo) {
   // OP: busca pelo começo do número, assim "012345" traz todos os itens/sequências (01234501001...)
   const sufixo = filial ? ` AND ${C.campoFilial}='${filial}'` : '';
   const where = (porOP ? `${C.campoOP} LIKE '${numero}%'` : `${C.campoRomaneio}='${numero}'`) + sufixo;
-  const campos = [C.campoFilial, C.campoRomaneio, C.campoProduto, C.campoQuantidade, C.campoNumero, C.campoSerie, C.campoOP, C.campoPartida].join(',');
+  const campos = [C.campoFilial, C.campoRomaneio, C.campoProduto, C.campoQuantidade, C.campoNumero, C.campoSerie, C.campoOP, C.campoPartida, C.campoEndereco].join(',');
 
   const t0 = Date.now();
   let rolos;
@@ -204,6 +205,9 @@ async function consultarRomaneio(params, tipo) {
     g.itens.push({
       numero: texto(ler(r, C.campoNumero)),
       serie: texto(ler(r, C.campoSerie)),
+      // RG do rolo = série + número (ex.: FPK6570), igual ao app de estoque
+      rg: texto(ler(r, C.campoSerie)) + texto(ler(r, C.campoNumero)),
+      endereco: texto(ler(r, C.campoEndereco)),
       romaneio: rom,
       op,
       partida: texto(ler(r, C.campoPartida)),
