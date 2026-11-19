@@ -580,13 +580,13 @@
         <td><span class="pill pill-${cls}">${rot}</span></td>
         <td class="cod">${esc(cod)}${lido}</td>
         <td class="desc">${esc(l.p ? l.p.descricao : l.it.descricao)}</td>
-        <td class="n">${ed('rolos', l.it?.rolos, false)}</td>
-        <td class="n">${l.p ? int(l.p.rolos) : '–'}</td>
-        <td class="n col-dest ${l.dRolos ? 'neg forte' : ''}">${l.dRolos == null ? '–' : l.dRolos === 0 ? '0' : (l.dRolos > 0 ? '+' : '') + l.dRolos}</td>
-        <td class="n">${ed('nw', l.it?.nw, true)}</td>
-        <td class="n">${l.p ? kg(l.p.quantidade) : '–'}</td>
-        <td class="n col-dest ${l.status === 'divergente' && foraTol(l.dPeso, tol) ? 'neg forte' : ''}">${l.dPeso == null ? '–' : kgSinal(l.dPeso)}</td>
-        <td class="n col-dest col-ajuste ${l.status === 'divergente' ? 'forte' : ''}">${l.p && l.it?.nw != null ? kg(l.it.nw) : '–'}</td>
+        <td class="n" data-l="Rolos planilha">${ed('rolos', l.it?.rolos, false)}</td>
+        <td class="n" data-l="Rolos sistema">${l.p ? int(l.p.rolos) : '–'}</td>
+        <td class="n col-dest ${l.dRolos ? 'neg forte' : ''}" data-l="Dif. rolos">${l.dRolos == null ? '–' : l.dRolos === 0 ? '0' : (l.dRolos > 0 ? '+' : '') + l.dRolos}</td>
+        <td class="n" data-l="Peso planilha">${ed('nw', l.it?.nw, true)}</td>
+        <td class="n" data-l="Peso sistema">${l.p ? kg(l.p.quantidade) : '–'}</td>
+        <td class="n col-dest ${l.status === 'divergente' && foraTol(l.dPeso, tol) ? 'neg forte' : ''}" data-l="Divergência">${l.dPeso == null ? '–' : kgSinal(l.dPeso)}</td>
+        <td class="n col-dest col-ajuste ${l.status === 'divergente' ? 'forte' : ''}" data-l="Ajustar sistema para">${l.p && l.it?.nw != null ? kg(l.it.nw) : '–'}</td>
       </tr>`;
     });
     $('confCorpo').innerHTML = h;

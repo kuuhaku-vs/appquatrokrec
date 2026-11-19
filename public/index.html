@@ -31,7 +31,7 @@
       <div class="marca">
         <span class="marca-selo"><img src="icone-192.png" alt="" aria-hidden="true"></span>
         <div>
-          <div class="marca-nome">Consulta de Romaneio <span class="marca-sep">-</span> Importação</div>
+          <div class="marca-nome">Consulta de Romaneio <span class="marca-sep">-</span> <span class="marca-imp">Importação</span></div>
           <div class="marca-sub">Malha por produto</div>
         </div>
       </div>
@@ -207,8 +207,9 @@
       <div class="conf-zona" id="confZona" tabindex="0" role="button" aria-describedby="confZonaDica">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4"/><path d="m7.5 8.5 4.5-4.5 4.5 4.5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
         <div>
-          <strong>Cole o print com <kbd>Ctrl</kbd>+<kbd>V</kbd></strong>
-          <span id="confZonaDica">ou arraste aqui um <b>PDF</b>, uma imagem (PNG, JPG) ou a planilha (XLSX, CSV). PDF salvo pelo Excel é lido sem OCR, com os números exatos.</span>
+          <strong class="so-mouse">Cole o print com <kbd>Ctrl</kbd>+<kbd>V</kbd></strong>
+          <strong class="so-toque">Toque para enviar o packing list</strong>
+          <span id="confZonaDica"><i class="so-mouse">ou arraste aqui um </i><i class="so-toque">Foto da tabela, </i><b>PDF</b>, imagem (PNG, JPG) ou planilha (XLSX, CSV). PDF salvo pelo Excel é lido sem OCR, com os números exatos.</span>
         </div>
         <span class="btn-sec">Escolher arquivo</span>
         <input type="file" id="confArquivo" accept="application/pdf,.pdf,image/*,.xlsx,.xls,.csv,.txt" hidden>

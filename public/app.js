@@ -221,7 +221,7 @@
       if (aberto) {
         h += `<tr class="detalhe"><td colspan="7"><div style="overflow-x:auto"><table class="rolos">
           <thead><tr><th>#</th><th>RG</th>${porOP ? '<th>Romaneio</th>' : ''}<th>OP</th><th>Partida</th><th>Endereço</th><th class="n">Qtde atual (kg)</th></tr></thead><tbody>
-          ${p.itens.map((r, i) => `<tr><td>${i + 1}</td><td class="rg">${esc(r.rg ?? `${r.serie || ''}${r.numero || ''}`)}</td>${porOP ? `<td>${esc(r.romaneio)}</td>` : ''}<td>${esc(r.op)}</td><td>${esc(r.partida)}</td><td>${r.endereco ? esc(r.endereco) : '<span class="sem">sem endereço</span>'}</td><td class="n">${kg(r.quantidade)}</td></tr>`).join('')}
+          ${p.itens.map((r, i) => `<tr><td class="r-num">${i + 1}</td><td class="rg">${esc(r.rg ?? `${r.serie || ''}${r.numero || ''}`)}</td>${porOP ? `<td data-l="Romaneio">${esc(r.romaneio)}</td>` : ''}<td data-l="OP">${esc(r.op)}</td><td data-l="Partida">${esc(r.partida)}</td><td data-l="End.">${r.endereco ? esc(r.endereco) : '<span class="sem">sem endereço</span>'}</td><td class="n">${kg(r.quantidade)}</td></tr>`).join('')}
           </tbody></table></div></td></tr>`;
       }
     }
