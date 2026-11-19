@@ -388,47 +388,108 @@ td.n:has(input.ed) { padding-block: 5px; }
   .bv-check circle, .bv-check path { stroke-dashoffset: 0; }
 }
 
-/* ---------- Relatório de divergências (impressão / PDF) ---------- */
+/* ---------- Relatórios impressos (romaneio/OP e divergências) ----------
+   Montados pelo impressao.js dentro de #relatorio; só aparecem no papel / PDF. */
 .relatorio { display: none; }
 
-/* ---------- Impressão ---------- */
-@media print {
-  :root, html[data-tema="escuro"] { --bg: #fff; --surface: #fff; --surface-2: #f2f2f2; --fg: #000; --muted: #444; --line: #ccc; --line-forte: #bbb; --accent: #000; --accent-fg: #fff; --accent-soft: #fff; --dest: #000; --dest-soft: #f3f3f3; --dest-head: #e6e6e6; color-scheme: light; }
-  body { font-size: 11px; background: #fff; }
-  .topo, .barra-ferr, .rodape-site, .toast, .alerta-aviso, .col-seta, tr.prod .seta, .conf-zona, .conf-controles, .arquivo { display: none !important; }
-  input.ed { border: 0; background: none; width: auto; }
-  .conteudo { padding: 0; max-width: none; }
-  .tabela-wrap { border: 0; box-shadow: none; overflow: visible; }
-  .tabela thead th { position: static; }
-  .stat-destaque { background: #fff; color: #000; border: 2px solid #000; }
-  tr.detalhe > td { padding-left: 20px; }
-  tr { break-inside: avoid; }
-
-  /* Só o relatório de divergências */
-  html, body { background: #fff !important; color: #000 !important; transition: none !important; }
-  body.imprimir-rel > *:not(.relatorio) { display: none !important; }
-  body.imprimir-rel .relatorio { display: block; color: #000; font: 11px/1.4 var(--body); }
+@page { size: A4 portrait; margin: 12mm 11mm 14mm; }
+@page paisagem { size: A4 landscape; margin: 10mm 11mm 13mm; }
+@page {
+  @bottom-right { content: "Página " counter(page) " de " counter(pages); font: 8pt "IBM Plex Sans", Arial, sans-serif; color: #5b6678; }
 }
-@page { margin: 12mm; }
-.relatorio .rel-cab { border-top: 5px solid #0f2340; padding-top: 10px; margin-bottom: 14px; }
-.relatorio .rel-empresa { font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: #555; }
-.relatorio h1 { margin: 4px 0 2px; font-size: 20px; }
-.relatorio .rel-sub { color: #555; font-size: 11px; }
-.relatorio .rel-resumo { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
-.relatorio .rel-resumo div { border: 1px solid #ccc; border-radius: 4px; padding: 6px 9px; display: grid; }
-.relatorio .rel-resumo span { font-size: 9px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #555; }
-.relatorio .rel-resumo b { font: 600 12px var(--mono); }
-.relatorio table { width: 100%; border-collapse: collapse; }
-.relatorio th, .relatorio td { border: 1px solid #bbb; padding: 5px 7px; text-align: left; color: #000; background: #fff; }
-.relatorio .rel-cab, .relatorio .rel-resumo div { color: #000; background: #fff; }
-.relatorio tbody tr td { background: #fff !important; color: #000; }
-.relatorio tbody tr td.dest { background: #eef3fa !important; }
-.relatorio th { background: #0f2340; color: #fff !important; font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-.relatorio th.dest { background: #1f4e8c !important; }
-.relatorio th:not(.dest) { background: #0f2340 !important; }
-.relatorio td.n, .relatorio th.n { text-align: right; font-family: var(--mono); white-space: nowrap; }
-.relatorio td.dest { font-weight: 700; background: #eef3fa !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-.relatorio tr.st-div td:first-child { color: #a3261e !important; font-weight: 700; }
-.relatorio tr.st-falta td:first-child { color: #7b5500 !important; font-weight: 700; }
-.relatorio tr { break-inside: avoid; }
-.relatorio .rel-nota { color: #555; font-size: 10px; margin-top: 10px; }
+@page paisagem {
+  @bottom-right { content: "Página " counter(page) " de " counter(pages); font: 8pt "IBM Plex Sans", Arial, sans-serif; color: #5b6678; }
+}
+
+@media print {
+  /* Papel é sempre claro, mesmo com o tema escuro ligado */
+  :root, html[data-tema="escuro"] { --bg: #fff; --surface: #fff; --surface-2: #f2f2f2; --fg: #000; --muted: #444; --line: #ccc; --line-forte: #bbb; --accent: #1f4e8c; --accent-fg: #fff; --accent-soft: #fff; --dest: #1f4e8c; --dest-soft: #f3f3f3; --dest-head: #e6e6e6; --erro: #a3261e; --erro-soft: #fdecea; --aviso: #7b5500; --aviso-soft: #fdf4de; --ok: #1d6b3a; --ok-soft: #e3f4e8; color-scheme: light !important; }
+  html, body { background: #fff !important; color: #000 !important; transition: none !important; animation: none !important; }
+  body { display: block; min-height: 0; font-size: 10pt; }
+
+  /* Com relatório montado: imprime só ele */
+  body.imprimir-rel > *:not(.relatorio) { display: none !important; }
+  body.imprimir-rel .relatorio { display: block; }
+
+  /* Sem relatório (caso raro): página limpa, sem a parte interativa */
+  body:not(.imprimir-rel) :is(.topo, .barra-ferr, .rodape-site, .toast, .alerta-aviso, .col-seta, .conf, .login, .boas-vindas, .inicio, .carregando) { display: none !important; }
+  body:not(.imprimir-rel) .conteudo { padding: 0; max-width: none; }
+  body:not(.imprimir-rel) .tabela-wrap { border: 0; box-shadow: none; overflow: visible; }
+  body:not(.imprimir-rel) .tabela thead th { position: static; }
+  body:not(.imprimir-rel) tr { break-inside: avoid; }
+}
+
+.relatorio {
+  --erro-soft: #fdecea; --aviso-soft: #fdf4de; --ok-soft: #e3f4e8; color-scheme: light;
+  --r-marca: #002491; --r-tinta: #0f1b2d; --r-sub: #5b6678; --r-linha: #c9d0db; --r-fundo: #f3f5f8; --r-dest: #eaf0f8;
+  color: var(--r-tinta); background: #fff; font: 9.5pt/1.4 var(--body);
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.relatorio.paisagem { page: paisagem; }
+.relatorio * { color: inherit; }
+
+/* Cabeçalho com a logo */
+.relatorio .rel-cab {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 0 6mm;
+  padding-bottom: 3.5mm; margin-bottom: 4mm; border-bottom: 2.2pt solid var(--r-marca);
+  break-inside: avoid; break-after: avoid;
+}
+.relatorio .rel-logo { display: block; height: 15mm; width: auto; }
+.relatorio .rel-tit { border-left: .75pt solid var(--r-linha); padding-left: 6mm; min-width: 0; }
+.relatorio h1 { margin: 0; font-size: 16pt; line-height: 1.15; font-weight: 700; color: var(--r-tinta); }
+.relatorio .rel-sub { margin-top: 1mm; font-size: 8.5pt; color: var(--r-sub); }
+.relatorio .rel-meta { margin: 0; display: grid; gap: 1mm; text-align: right; font-size: 8pt; }
+.relatorio .rel-meta dt { color: var(--r-sub); font-size: 7pt; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.relatorio .rel-meta dd { margin: 0; font-family: var(--mono); font-weight: 500; }
+
+/* Totais */
+.relatorio .rel-resumo { display: flex; gap: 3mm; margin-bottom: 4mm; break-inside: avoid; break-after: avoid; }
+.relatorio .rel-resumo div { flex: 1 1 0; min-width: 0; border: .75pt solid var(--r-linha); border-radius: 1.5mm; padding: 2mm 3mm; background: var(--r-fundo); }
+.relatorio .rel-resumo div:first-child { border-color: var(--r-marca); border-left-width: 2.5pt; background: #fff; }
+.relatorio .rel-resumo span { display: block; font-size: 6.8pt; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--r-sub); }
+.relatorio .rel-resumo b { display: block; margin-top: .5mm; font: 600 10.5pt var(--mono); font-variant-numeric: tabular-nums; }
+
+/* Tabela */
+.relatorio .rel-tab { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.relatorio .rel-tab thead { display: table-header-group; } /* repete o cabeçalho em cada página */
+.relatorio .rel-tab tfoot { display: table-row-group; }    /* total só no fim, não em toda página */
+.relatorio .rel-tab th, .relatorio .rel-tab td { padding: 1.4mm 2mm; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+.relatorio .rel-tab > thead th {
+  background: var(--r-marca); color: #fff; font-size: 7pt; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; line-height: 1.25; vertical-align: bottom;
+  border: .75pt solid var(--r-marca);
+}
+.relatorio .rel-tab > thead th.dest { background: #1f4e8c; border-color: #1f4e8c; }
+.relatorio .rel-tab > thead th.n { white-space: normal; }
+.relatorio .rel-tab > tbody > tr > td { border-bottom: .5pt solid var(--r-linha); }
+.relatorio .rel-tab > tbody > tr:nth-child(even of :not(.rolos-linha)) > td { background: #fafbfc; }
+.relatorio .rel-tab td.dest { background: var(--r-dest) !important; font-weight: 700; }
+.relatorio .rel-tab .n { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; overflow-wrap: normal; }
+.relatorio .rel-tab .cod { font-family: var(--mono); font-size: 8.5pt; }
+.relatorio .rel-tab tr { break-inside: avoid; }
+.relatorio .rel-tab > tfoot td { border-top: 1.5pt solid var(--r-marca); border-bottom: 1.5pt solid var(--r-marca); background: var(--r-fundo); font-weight: 700; }
+.relatorio .rel-tab > tfoot td.dest { background: var(--r-dest); }
+
+/* Rolos de um produto (romaneio com produtos abertos) */
+.relatorio .rel-tab tr.prod:has(+ tr.rolos-linha) > td { border-bottom: 0; }
+.relatorio .rel-tab tr.rolos-linha > td { padding: 0 0 2.5mm 6mm; border-bottom: .5pt solid var(--r-linha); background: #fff; }
+.relatorio .rel-rolos { width: 100%; border-collapse: collapse; font-size: 8pt; }
+.relatorio .rel-rolos th { text-align: left; font-size: 6.6pt; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--r-sub); border-bottom: .75pt solid var(--r-linha); padding: .8mm 1.6mm; }
+.relatorio .rel-rolos td { padding: .6mm 1.6mm; border-bottom: .25pt dotted var(--r-linha); }
+.relatorio .rel-rolos .n { text-align: right; font-family: var(--mono); white-space: nowrap; }
+.relatorio .rel-rolos .cod { font-family: var(--mono); }
+.relatorio .rel-rolos tr { break-inside: avoid; }
+
+/* Divergências: situação em selo colorido */
+.relatorio .rel-st { display: inline-block; padding: .3mm 1.8mm; border-radius: 3mm; font-size: 7.2pt; font-weight: 700; white-space: nowrap; background: #e3f4e8; color: #1d6b3a; }
+.relatorio tr.st-div .rel-st { background: #fdecea; color: #a3261e; }
+.relatorio tr.st-falta .rel-st { background: #fdf4de; color: #7b5500; }
+.relatorio tr.st-div td.dest:nth-child(7) { color: #a3261e; }
+
+/* Rodapé, nota e assinaturas */
+.relatorio .rel-nota { margin: 3mm 0 0; color: var(--r-sub); font-size: 7.8pt; }
+.relatorio .rel-assin { display: flex; gap: 10mm; margin-top: 14mm; break-inside: avoid; }
+.relatorio .rel-assin div { flex: 1 1 0; }
+.relatorio .rel-assin div:last-child { flex: 0 0 35mm; }
+.relatorio .rel-assin i { display: block; border-top: .75pt solid var(--r-tinta); }
+.relatorio .rel-assin span { display: block; margin-top: 1mm; font-size: 7.5pt; color: var(--r-sub); }
+.relatorio .rel-rodape { margin-top: 6mm; padding-top: 1.5mm; border-top: .5pt solid var(--r-linha); font-size: 7.5pt; color: var(--r-sub); break-inside: avoid; }

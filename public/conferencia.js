@@ -655,25 +655,26 @@
     };
   }
 
-  // Imprimir / salvar em PDF: monta o relatório e imprime só ele
+  // Imprimir / salvar em PDF: relatório próprio para papel (A4 deitado), com a logo
   $('confPdf').addEventListener('click', () => {
     if (!ultima) return;
     const d = dadosRelatorio();
-    $('relatorio').innerHTML = `
-      <div class="rel-cab">
-        <div><div class="rel-empresa">${EMPRESA}</div><h1>Divergências do romaneio ${esc(d.numero)}</h1><div class="rel-sub">Conferência com packing list · gerado em ${esc(d.quando)}</div></div>
-      </div>
-      <div class="rel-resumo">${d.resumo.map(([a, b]) => `<div><span>${esc(a)}</span><b>${esc(b)}</b></div>`).join('')}</div>
-      <table><thead><tr>${d.cab.map((c, i) => `<th class="${i >= 3 ? 'n' : ''} ${i === 3 || i >= 6 ? 'dest' : ''}">${esc(c)}</th>`).join('')}</tr></thead>
-      <tbody>${d.linhas.length ? d.linhas.map((l) => `<tr class="st-${l.cls}">${l.c.map((v, i) => `<td class="${i >= 3 ? 'n' : ''} ${i === 3 || i >= 6 ? 'dest' : ''}">${esc(v)}</td>`).join('')}</tr>`).join('') : '<tr><td colspan="8">Nenhuma divergência.</td></tr>'}</tbody></table>
-      <p class="rel-nota">Divergência = Peso na planilha − Peso no sistema. "Ajustar para" é o peso da planilha, para lançar no Protheus.</p>`;
-    document.body.classList.add('imprimir-rel');
-    const fim = () => { document.body.classList.remove('imprimir-rel'); window.removeEventListener('afterprint', fim); };
-    window.addEventListener('afterprint', fim);
-    const titulo = document.title; document.title = nomeBase();
-    window.print();
-    document.title = titulo;
-    setTimeout(fim, 500);
+    const dest = (i) => i === 3 || i >= 6;
+    const cls = (i) => [i >= 3 ? 'n' : '', i === 1 ? 'cod' : '', dest(i) ? 'dest' : ''].join(' ').trim();
+    window.Impressao.imprimir({
+      titulo: `Divergências do romaneio ${d.numero}`,
+      subtitulo: 'Conferência com packing list',
+      resumo: d.resumo,
+      corpo: `<table class="rel-tab rel-tab-div">
+        <colgroup><col style="width:11%"><col style="width:12%"><col><col style="width:7%"><col style="width:10%"><col style="width:10%"><col style="width:10%"><col style="width:10%"></colgroup>
+        <thead><tr>${d.cab.map((c, i) => `<th class="${cls(i)}">${esc(c)}</th>`).join('')}</tr></thead>
+        <tbody>${d.linhas.length ? d.linhas.map((l) => `<tr class="st-${l.cls}">${l.c.map((v, i) => `<td class="${cls(i)}">${i === 0 ? `<span class="rel-st">${esc(v)}</span>` : esc(v)}</td>`).join('')}</tr>`).join('') : '<tr><td colspan="8">Nenhuma divergência.</td></tr>'}</tbody>
+      </table>`,
+      nota: 'Divergência = Peso na planilha − Peso no sistema. "Ajustar para" é o peso da planilha, para lançar no Protheus.',
+      assinaturas: ['Conferido por', 'Ajustado no Protheus por', 'Data'],
+      paisagem: true,
+      arquivo: nomeBase(),
+    });
   });
 
   // PNG: desenha o relatório num canvas (sempre no tema claro)
@@ -692,10 +693,21 @@
     const F = '"IBM Plex Sans", "Segoe UI", Arial, sans-serif', M = '"IBM Plex Mono", Consolas, monospace';
     g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H);
     g.fillStyle = '#0f2340'; g.fillRect(0, 0, W, 8);
-    let y = pad + 10;
-    g.fillStyle = '#5b6678'; g.font = `600 15px ${F}`; g.fillText(EMPRESA.toUpperCase(), pad, y);
-    y += 38; g.fillStyle = '#0f1b2d'; g.font = `700 32px ${F}`; g.fillText(`Divergências do romaneio ${d.numero}`, pad, y);
-    y += 30; g.fillStyle = '#5b6678'; g.font = `400 16px ${F}`; g.fillText(`Conferência com packing list · gerado em ${d.quando}`, pad, y);
+    // Cabeçalho: logo do Grupo Quatro K, título e data
+    const logo = await window.Impressao?.logoPronta;
+    let xt = pad;
+    if (logo) {
+      const lh = 70, lw = lh * logo.naturalWidth / logo.naturalHeight;
+      g.drawImage(logo, pad, pad - 8, lw, lh);
+      xt = pad + lw + 28;
+      g.fillStyle = '#dde2ea'; g.fillRect(xt - 14, pad - 6, 1.5, lh - 4);
+    } else {
+      g.fillStyle = '#5b6678'; g.font = `600 15px ${F}`; g.fillText(EMPRESA.toUpperCase(), pad, pad + 4);
+    }
+    let y = pad + 26;
+    g.fillStyle = '#0f1b2d'; g.font = `700 30px ${F}`; g.fillText(`Divergências do romaneio ${d.numero}`, xt, y);
+    y += 30; g.fillStyle = '#5b6678'; g.font = `400 16px ${F}`; g.fillText(`Conferência com packing list · gerado em ${d.quando}`, xt, y);
+    y = pad + 72;
     // Resumo
     y += 30; const wR = (W - pad * 2 - 3 * 14) / 4;
     d.resumo.forEach(([a, b], i) => {

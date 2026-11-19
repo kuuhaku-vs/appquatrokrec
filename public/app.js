@@ -280,7 +280,66 @@
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   });
-  $('btnImprimir').addEventListener('click', () => window.print());
+  // ---------- Imprimir ----------
+  // Relatório próprio para papel: cabeçalho com a logo, totais, tabela de produtos
+  // (com os rolos dos produtos abertos na tela) e o filtro aplicado, se houver.
+  function relatorioRomaneio() {
+    if (!atual || $('resultado').hidden) return null;
+    const j = atual, T = TIPOS[j.tipo], porOP = j.tipo === 'op';
+    const lista = produtosVisiveis();
+    const total = j.totalQuantidade || 1;
+    const filtro = $('filtro').value.trim();
+    const filtrado = lista.length !== j.produtos.length;
+    const sRolos = lista.reduce((s, p) => s + p.rolos, 0);
+    const sQtd = lista.reduce((s, p) => s + p.quantidade, 0);
+    const quando = new Date(j.consultadoEm).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+    const roms = porOP ? (j.romaneios || []) : [];
+    const sub = [
+      roms.length ? `${roms.length === 1 ? 'Romaneio' : 'Romaneios'}: ${esc(roms.join(', '))}` : '',
+      `Consultado no Protheus em ${esc(quando)}`,
+      filtrado ? `Filtro “${esc(filtro)}”: ${int(lista.length)} de ${int(j.produtos.length)} produtos` : '',
+    ].filter(Boolean).join(' · ');
+
+    const nCols = 5;
+    let linhas = '';
+    for (const p of lista) {
+      linhas += `<tr class="prod">
+        <td class="cod">${esc(p.codigo || '–')}</td>
+        <td>${esc(p.descricao || 'sem descrição')}</td>
+        <td class="n">${int(p.rolos)}</td>
+        <td class="n dest">${kg(p.quantidade)}</td>
+        <td class="n">${pct((p.quantidade / total) * 100)}</td></tr>`;
+      if (abertos.has(p.codigo) && p.itens?.length) {
+        linhas += `<tr class="rolos-linha"><td colspan="${nCols}"><table class="rel-rolos">
+          <thead><tr><th class="n">#</th><th>RG</th>${porOP ? '<th>Romaneio</th>' : ''}<th>OP</th><th>Partida</th><th>Endereço</th><th class="n">Qtde (kg)</th></tr></thead>
+          <tbody>${p.itens.map((r, i) => `<tr><td class="n">${i + 1}</td><td class="cod">${esc(r.rg ?? `${r.serie || ''}${r.numero || ''}`)}</td>${porOP ? `<td>${esc(r.romaneio)}</td>` : ''}<td>${esc(r.op)}</td><td>${esc(r.partida)}</td><td>${esc(r.endereco || '–')}</td><td class="n">${kg(r.quantidade)}</td></tr>`).join('')}</tbody>
+        </table></td></tr>`;
+      }
+    }
+    if (!lista.length) linhas = `<tr><td colspan="${nCols}">Nenhum produto corresponde ao filtro.</td></tr>`;
+
+    return {
+      titulo: `${T.nome} ${j.numero}`,
+      subtitulo: sub,
+      resumo: [
+        ['Qtde atual', `${kg(sQtd)} kg`],
+        ['Rolos', int(sRolos)],
+        ['Produtos', int(lista.length)],
+        ['Média por rolo', `${kg(sRolos ? sQtd / sRolos : 0)} kg`],
+      ],
+      corpo: `<table class="rel-tab rel-tab-rom">
+        <colgroup><col style="width:17%"><col><col style="width:8%"><col style="width:15%"><col style="width:12%"></colgroup>
+        <thead><tr><th>Código</th><th>Produto</th><th class="n">Rolos</th><th class="n dest">Qtde atual (kg)</th><th class="n">${porOP ? '% da OP' : '% do romaneio'}</th></tr></thead>
+        <tbody>${linhas}</tbody>
+        ${lista.length ? `<tfoot><tr><td colspan="2">${filtrado ? `Total filtrado (${int(lista.length)} de ${int(j.produtos.length)})` : `Total ${T.de}`}</td><td class="n">${int(sRolos)}</td><td class="n dest">${kg(sQtd)}</td><td class="n">${pct((sQtd / total) * 100)}</td></tr></tfoot>` : ''}
+      </table>`,
+      nota: abertos.size ? '' : 'Para listar os rolos de cada produto na impressão, abra os produtos na tela (ou use "Abrir todos") antes de imprimir.',
+      assinaturas: ['Conferido por', 'Data'],
+      arquivo: `${porOP ? 'op' : 'romaneio'}-${j.numero}`,
+    };
+  }
+  window.Impressao.padrao = relatorioRomaneio;
+  $('btnImprimir').addEventListener('click', () => { const o = relatorioRomaneio(); if (o) window.Impressao.imprimir(o); });
 
   // ---------- Atalhos e início ----------
   document.addEventListener('keydown', (e) => {
