@@ -345,10 +345,12 @@
         <td class="n dest">${kg(p.quantidade)}</td>
         ${comPct ? `<td class="n">${pct((p.quantidade / total) * 100)}</td>` : ''}</tr>`;
       if (comRolos(p) && p.itens?.length) {
-        linhas += `<tr class="rolos-linha"><td colspan="${nCols}"><table class="rel-rolos">
-          <thead><tr><th class="n">#</th><th>RG</th>${porOP ? '<th>Romaneio</th>' : ''}<th>OP</th><th>Partida</th><th>Endereço</th><th class="n">Qtde (kg)</th></tr></thead>
-          <tbody>${p.itens.map((r, i) => `<tr><td class="n">${i + 1}</td><td class="cod">${esc(r.rg ?? `${r.serie || ''}${r.numero || ''}`)}</td>${porOP ? `<td>${esc(r.romaneio)}</td>` : ''}<td>${esc(r.op)}</td><td>${esc(r.partida)}</td><td>${esc(r.endereco || '–')}</td><td class="n">${kg(r.quantidade)}</td></tr>`).join('')}</tbody>
-        </table></td></tr>`;
+        // Cada rolo é uma linha da tabela principal: a lista quebra de página
+        // normalmente, sem empurrar o bloco inteiro para a folha seguinte
+        const g = porOP ? 'grid-op' : '';
+        const n = p.itens.length;
+        linhas += `<tr class="rolo rolo-cab"><td colspan="${nCols}"><div class="rel-rolo ${g}"><span class="n">#</span><span>RG</span>${porOP ? '<span>Romaneio</span>' : ''}<span>OP</span><span>Partida</span><span>Endereço</span><span class="n">Qtde (kg)</span></div></td></tr>`;
+        linhas += p.itens.map((r, i) => `<tr class="rolo${i === n - 1 ? ' rolo-fim' : ''}"><td colspan="${nCols}"><div class="rel-rolo ${g}"><span class="n">${i + 1}</span><span class="cod">${esc(r.rg ?? `${r.serie || ''}${r.numero || ''}`)}</span>${porOP ? `<span>${esc(r.romaneio)}</span>` : ''}<span>${esc(r.op)}</span><span>${esc(r.partida)}</span><span>${esc(r.endereco || '–')}</span><span class="n">${kg(r.quantidade)}</span></div></td></tr>`).join('');
       }
     }
     if (!lista.length) linhas = `<tr><td colspan="${nCols}">Nenhum produto para imprimir.</td></tr>`;

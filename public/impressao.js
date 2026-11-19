@@ -162,11 +162,11 @@
         </div>
         <footer class="imp-rodape">
           <button type="button" class="btn-sec" data-acao="restaurar">Restaurar padrão</button>
-          <span class="imp-esp"></span>
+          <span class="imp-esp">Em seguida abre a tela do navegador para escolher a impressora ou "Salvar como PDF".</span>
           <button type="button" class="btn-sec" data-acao="cancelar">Cancelar</button>
           <button type="submit" class="btn-pri">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V4h10v5"/><rect x="4" y="9" width="16" height="8" rx="1.5"/><path d="M7 14h10v6H7z"/></svg>
-            Imprimir
+            Continuar
           </button>
         </footer>
       </form>`;
