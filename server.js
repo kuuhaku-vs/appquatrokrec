@@ -277,7 +277,8 @@ function arquivoEstatico(res, caminho) {
       // Qualquer rota desconhecida abre o site (ex.: /romaneio/00529749)
       return arquivoEstatico(res, '/');
     }
-    res.writeHead(200, { 'Content-Type': TIPOS[path.extname(alvo).toLowerCase()] || 'application/octet-stream' });
+    // no-cache: o navegador confere com o servidor antes de usar a cópia guardada (pega versões novas)
+    res.writeHead(200, { 'Content-Type': TIPOS[path.extname(alvo).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-cache', 'Last-Modified': st.mtime.toUTCString() });
     fs.createReadStream(alvo).pipe(res);
   });
 }

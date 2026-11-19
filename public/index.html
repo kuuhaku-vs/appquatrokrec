@@ -171,6 +171,7 @@
         <input id="filtro" placeholder="Filtrar por código ou descrição" aria-label="Filtrar produtos">
       </label>
       <div class="acoes">
+        <span class="sel-info" id="selInfo" hidden><span id="selQtd"></span><button type="button" id="selLimpar">Limpar seleção</button></span>
         <button class="btn-sec" id="btnExpandir" type="button">Abrir todos</button>
         <button class="btn-sec" id="btnCopiar" type="button">Copiar para o Excel</button>
         <button class="btn-sec" id="btnCsv" type="button">Baixar CSV</button>
@@ -182,6 +183,7 @@
       <table class="tabela" id="tabelaProdutos">
         <thead>
           <tr>
+            <th class="col-sel"><label><input type="checkbox" id="selTodos" aria-label="Selecionar todos para imprimir"></label></th>
             <th class="col-seta" aria-label="Detalhe"></th>
             <th data-ordem="codigo">Código</th>
             <th data-ordem="descricao">Produto</th>
@@ -295,6 +297,7 @@
 
 <script src="protheus.js"></script>
 <script src="impressao.js"></script>
+<script src="versao.js"></script>
 <script src="app.js"></script>
 <script src="conferencia.js"></script>
 </body>

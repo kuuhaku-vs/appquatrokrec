@@ -9,6 +9,7 @@
   let atual = null;           // última resposta da API
   let ordem = { col: 'codigo', asc: true };
   const abertos = new Set();  // códigos com detalhe aberto
+  const selecionados = new Set(); // códigos marcados para imprimir
   let consultaId = 0;
 
   // ---------- Histórico ----------
@@ -127,6 +128,7 @@
       j.tipo = tipo;
       atual = j;
       abertos.clear();
+      selecionados.clear();
       $('filtro').value = '';
       if (!j.totalRolos) {
         atual = null;
@@ -158,13 +160,14 @@
   // ---------- Render ----------
   function produtosVisiveis() {
     const f = $('filtro').value.trim().toLowerCase();
-    let l = atual.produtos.filter((p) => !f || p.codigo.toLowerCase().includes(f) || p.descricao.toLowerCase().includes(f));
+    return ordenar(atual.produtos.filter((p) => !f || p.codigo.toLowerCase().includes(f) || p.descricao.toLowerCase().includes(f)));
+  }
+  function ordenar(l) {
     const { col, asc } = ordem;
-    l = l.slice().sort((a, b) => {
+    return l.slice().sort((a, b) => {
       const r = typeof a[col] === 'number' ? a[col] - b[col] : String(a[col]).localeCompare(String(b[col]), 'pt-BR', { numeric: true });
       return asc ? r : -r;
     });
-    return l;
   }
 
   function renderTudo() {
@@ -202,11 +205,12 @@
     });
 
     let h = '';
-    if (!lista.length) h = '<tr class="vazio"><td colspan="6">Nenhum produto corresponde ao filtro.</td></tr>';
+    if (!lista.length) h = '<tr class="vazio"><td colspan="7">Nenhum produto corresponde ao filtro.</td></tr>';
     for (const p of lista) {
       const aberto = abertos.has(p.codigo);
       const share = (p.quantidade / total) * 100;
-      h += `<tr class="prod" tabindex="0" data-cod="${esc(p.codigo)}" aria-expanded="${aberto}">
+      h += `<tr class="prod${selecionados.has(p.codigo) ? ' sel' : ''}" tabindex="0" data-cod="${esc(p.codigo)}" aria-expanded="${aberto}">
+        <td class="col-sel"><label><input type="checkbox" class="sel" ${selecionados.has(p.codigo) ? 'checked' : ''} aria-label="Selecionar ${esc(p.codigo || p.descricao)} para imprimir"></label></td>
         <td class="col-seta">${SETA}</td>
         <td class="cod">${p.codigo ? esc(p.codigo) : '<span class="sem">sem código</span>'}</td>
         <td class="desc">${p.descricao ? esc(p.descricao) : '<span class="sem">sem descrição</span>'}</td>
@@ -215,7 +219,7 @@
         <td class="col-part"><div class="part"><div class="part-barra"><i style="width:${((p.quantidade / maior) * 100).toFixed(1)}%"></i></div><span class="part-num">${pct(share)}</span></div></td>
       </tr>`;
       if (aberto) {
-        h += `<tr class="detalhe"><td colspan="6"><div style="overflow-x:auto"><table class="rolos">
+        h += `<tr class="detalhe"><td colspan="7"><div style="overflow-x:auto"><table class="rolos">
           <thead><tr><th>#</th><th>RG</th>${porOP ? '<th>Romaneio</th>' : ''}<th>OP</th><th>Partida</th><th>Endereço</th><th class="n">Qtde atual (kg)</th></tr></thead><tbody>
           ${p.itens.map((r, i) => `<tr><td>${i + 1}</td><td class="rg">${esc(r.rg ?? `${r.serie || ''}${r.numero || ''}`)}</td>${porOP ? `<td>${esc(r.romaneio)}</td>` : ''}<td>${esc(r.op)}</td><td>${esc(r.partida)}</td><td>${r.endereco ? esc(r.endereco) : '<span class="sem">sem endereço</span>'}</td><td class="n">${kg(r.quantidade)}</td></tr>`).join('')}
           </tbody></table></div></td></tr>`;
@@ -226,14 +230,41 @@
     const filtrado = lista.length !== atual.produtos.length;
     const sRolos = lista.reduce((s, p) => s + p.rolos, 0);
     const sQtd = lista.reduce((s, p) => s + p.quantidade, 0);
-    $('rodape').innerHTML = lista.length ? `<tr><td></td><td colspan="2">${filtrado ? `Total filtrado (${lista.length} de ${atual.produtos.length})` : `Total ${TIPOS[atual.tipo].de}`}</td>
+    $('rodape').innerHTML = lista.length ? `<tr><td class="col-sel"></td><td></td><td colspan="2">${filtrado ? `Total filtrado (${lista.length} de ${atual.produtos.length})` : `Total ${TIPOS[atual.tipo].de}`}</td>
       <td class="n">${int(sRolos)}</td><td class="n">${kg(sQtd)}</td><td class="col-part"><span class="part-num" style="width:auto">${pct((sQtd / total) * 100)}</span></td></tr>` : '';
     $('btnExpandir').textContent = abertos.size && lista.every((p) => abertos.has(p.codigo)) ? 'Fechar todos' : 'Abrir todos';
+    atualizarSelecao();
   }
 
+  // ---------- Seleção para imprimir ----------
+  function atualizarSelecao() {
+    if (!atual) return;
+    const lista = produtosVisiveis();
+    const marcados = lista.filter((p) => selecionados.has(p.codigo)).length;
+    const todos = $('selTodos');
+    todos.checked = !!lista.length && marcados === lista.length;
+    todos.indeterminate = marcados > 0 && marcados < lista.length;
+    $('selInfo').hidden = !selecionados.size;
+    $('selQtd').textContent = selecionados.size === 1 ? '1 selecionado' : `${int(selecionados.size)} selecionados`;
+    $('btnImprimir').textContent = selecionados.size ? `Imprimir seleção (${int(selecionados.size)})` : 'Imprimir';
+  }
+  $('corpo').addEventListener('change', (e) => {
+    if (!e.target.matches('input.sel')) return;
+    const tr = e.target.closest('tr.prod');
+    e.target.checked ? selecionados.add(tr.dataset.cod) : selecionados.delete(tr.dataset.cod);
+    tr.classList.toggle('sel', e.target.checked);
+    atualizarSelecao();
+  });
+  $('selTodos').addEventListener('change', (e) => {
+    produtosVisiveis().forEach((p) => (e.target.checked ? selecionados.add(p.codigo) : selecionados.delete(p.codigo)));
+    renderTabela();
+  });
+  $('selLimpar').addEventListener('click', () => { selecionados.clear(); renderTabela(); });
+
   function alternar(cod) { abertos.has(cod) ? abertos.delete(cod) : abertos.add(cod); renderTabela(); }
-  $('corpo').addEventListener('click', (e) => { const tr = e.target.closest('tr.prod'); if (tr) alternar(tr.dataset.cod); });
+  $('corpo').addEventListener('click', (e) => { if (e.target.closest('.col-sel')) return; const tr = e.target.closest('tr.prod'); if (tr) alternar(tr.dataset.cod); });
   $('corpo').addEventListener('keydown', (e) => {
+    if (e.target.matches('input')) return;
     const tr = e.target.closest('tr.prod');
     if (tr && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); alternar(tr.dataset.cod); document.querySelector(`tr.prod[data-cod="${CSS.escape(tr.dataset.cod)}"]`)?.focus(); }
   });
@@ -281,15 +312,18 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   });
   // ---------- Imprimir ----------
-  // Relatório próprio para papel: cabeçalho com a logo, totais, tabela de produtos
-  // (com os rolos dos produtos abertos na tela) e o filtro aplicado, se houver.
-  function relatorioRomaneio() {
-    if (!atual || $('resultado').hidden) return null;
+  // Relatório próprio para papel: cabeçalho com a logo, totais e tabela de produtos.
+  // As opções (seleção, rolos, colunas...) vêm da janela de impressão.
+  function relatorioRomaneio(op) {
     const j = atual, T = TIPOS[j.tipo], porOP = j.tipo === 'op';
-    const lista = produtosVisiveis();
+    const visiveis = produtosVisiveis();
+    const soSel = op.produtos === 'selecionados' && selecionados.size;
+    const lista = soSel ? ordenar(j.produtos.filter((p) => selecionados.has(p.codigo))) : visiveis;
     const total = j.totalQuantidade || 1;
     const filtro = $('filtro').value.trim();
-    const filtrado = lista.length !== j.produtos.length;
+    const parcial = lista.length !== j.produtos.length;
+    const comPct = op.pct !== false;
+    const comRolos = (p) => op.rolos === 'todos' || (op.rolos === 'abertos' && abertos.has(p.codigo));
     const sRolos = lista.reduce((s, p) => s + p.rolos, 0);
     const sQtd = lista.reduce((s, p) => s + p.quantidade, 0);
     const quando = new Date(j.consultadoEm).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
@@ -297,10 +331,11 @@
     const sub = [
       roms.length ? `${roms.length === 1 ? 'Romaneio' : 'Romaneios'}: ${esc(roms.join(', '))}` : '',
       `Consultado no Protheus em ${esc(quando)}`,
-      filtrado ? `Filtro “${esc(filtro)}”: ${int(lista.length)} de ${int(j.produtos.length)} produtos` : '',
+      soSel ? `Seleção: ${int(lista.length)} de ${int(j.produtos.length)} produtos`
+        : parcial ? `Filtro “${esc(filtro)}”: ${int(lista.length)} de ${int(j.produtos.length)} produtos` : '',
     ].filter(Boolean).join(' · ');
 
-    const nCols = 5;
+    const nCols = comPct ? 5 : 4;
     let linhas = '';
     for (const p of lista) {
       linhas += `<tr class="prod">
@@ -308,15 +343,16 @@
         <td>${esc(p.descricao || 'sem descrição')}</td>
         <td class="n">${int(p.rolos)}</td>
         <td class="n dest">${kg(p.quantidade)}</td>
-        <td class="n">${pct((p.quantidade / total) * 100)}</td></tr>`;
-      if (abertos.has(p.codigo) && p.itens?.length) {
+        ${comPct ? `<td class="n">${pct((p.quantidade / total) * 100)}</td>` : ''}</tr>`;
+      if (comRolos(p) && p.itens?.length) {
         linhas += `<tr class="rolos-linha"><td colspan="${nCols}"><table class="rel-rolos">
           <thead><tr><th class="n">#</th><th>RG</th>${porOP ? '<th>Romaneio</th>' : ''}<th>OP</th><th>Partida</th><th>Endereço</th><th class="n">Qtde (kg)</th></tr></thead>
           <tbody>${p.itens.map((r, i) => `<tr><td class="n">${i + 1}</td><td class="cod">${esc(r.rg ?? `${r.serie || ''}${r.numero || ''}`)}</td>${porOP ? `<td>${esc(r.romaneio)}</td>` : ''}<td>${esc(r.op)}</td><td>${esc(r.partida)}</td><td>${esc(r.endereco || '–')}</td><td class="n">${kg(r.quantidade)}</td></tr>`).join('')}</tbody>
         </table></td></tr>`;
       }
     }
-    if (!lista.length) linhas = `<tr><td colspan="${nCols}">Nenhum produto corresponde ao filtro.</td></tr>`;
+    if (!lista.length) linhas = `<tr><td colspan="${nCols}">Nenhum produto para imprimir.</td></tr>`;
+    const nenhumAberto = op.rolos === 'abertos' && !lista.some((p) => abertos.has(p.codigo));
 
     return {
       titulo: `${T.nome} ${j.numero}`,
@@ -328,18 +364,38 @@
         ['Média por rolo', `${kg(sRolos ? sQtd / sRolos : 0)} kg`],
       ],
       corpo: `<table class="rel-tab rel-tab-rom">
-        <colgroup><col style="width:17%"><col><col style="width:8%"><col style="width:15%"><col style="width:12%"></colgroup>
-        <thead><tr><th>Código</th><th>Produto</th><th class="n">Rolos</th><th class="n dest">Qtde atual (kg)</th><th class="n">${porOP ? '% da OP' : '% do romaneio'}</th></tr></thead>
+        <colgroup><col style="width:17%"><col><col style="width:8%"><col style="width:15%">${comPct ? '<col style="width:12%">' : ''}</colgroup>
+        <thead><tr><th>Código</th><th>Produto</th><th class="n">Rolos</th><th class="n dest">Qtde atual (kg)</th>${comPct ? `<th class="n">${porOP ? '% da OP' : '% do romaneio'}</th>` : ''}</tr></thead>
         <tbody>${linhas}</tbody>
-        ${lista.length ? `<tfoot><tr><td colspan="2">${filtrado ? `Total filtrado (${int(lista.length)} de ${int(j.produtos.length)})` : `Total ${T.de}`}</td><td class="n">${int(sRolos)}</td><td class="n dest">${kg(sQtd)}</td><td class="n">${pct((sQtd / total) * 100)}</td></tr></tfoot>` : ''}
+        ${lista.length ? `<tfoot><tr><td colspan="2">${soSel ? `Total da seleção (${int(lista.length)} de ${int(j.produtos.length)})` : parcial ? `Total filtrado (${int(lista.length)} de ${int(j.produtos.length)})` : `Total ${T.de}`}</td><td class="n">${int(sRolos)}</td><td class="n dest">${kg(sQtd)}</td>${comPct ? `<td class="n">${pct((sQtd / total) * 100)}</td>` : ''}</tr></tfoot>` : ''}
       </table>`,
-      nota: abertos.size ? '' : 'Para listar os rolos de cada produto na impressão, abra os produtos na tela (ou use "Abrir todos") antes de imprimir.',
+      nota: nenhumAberto ? 'Os rolos não foram listados porque nenhum produto está aberto na tela. Para listar, escolha "De todos os produtos" em "Rolos de cada produto".' : '',
       assinaturas: ['Conferido por', 'Data'],
       arquivo: `${porOP ? 'op' : 'romaneio'}-${j.numero}`,
     };
   }
-  window.Impressao.padrao = relatorioRomaneio;
-  $('btnImprimir').addEventListener('click', () => { const o = relatorioRomaneio(); if (o) window.Impressao.imprimir(o); });
+  // Opções da janela de impressão do romaneio / OP
+  function opcoesRomaneio() {
+    if (!atual || $('resultado').hidden) return null;
+    const T = TIPOS[atual.tipo], n = produtosVisiveis().length, k = selecionados.size;
+    const filtrado = n !== atual.produtos.length;
+    return {
+      chave: 'romaneio',
+      janela: `Imprimir ${T.nome === 'OP' ? 'OP' : 'romaneio'} ${atual.numero}`,
+      tituloPadrao: `${T.nome} ${atual.numero}`,
+      paisagem: false,
+      campos: [
+        { id: 'produtos', tipo: 'radio', rotulo: 'Produtos', salvar: false, padrao: k ? 'selecionados' : 'visiveis',
+          opcoes: [['visiveis', filtrado ? `Os da tela, com o filtro (${int(n)})` : `Todos (${int(n)})`], ['selecionados', k ? `Só os selecionados (${int(k)})` : 'Só os selecionados (marque na tabela)', !k]] },
+        { id: 'rolos', tipo: 'radio', rotulo: 'Rolos de cada produto', padrao: 'abertos',
+          opcoes: [['nao', 'Não listar'], ['abertos', `Só dos produtos abertos na tela (${int(abertos.size)})`], ['todos', 'De todos os produtos']] },
+        { id: 'pct', tipo: 'check', rotulo: `Coluna "${atual.tipo === 'op' ? '% da OP' : '% do romaneio'}"`, padrao: true },
+      ],
+      gerar: relatorioRomaneio,
+    };
+  }
+  window.Impressao.padrao = opcoesRomaneio;
+  $('btnImprimir').addEventListener('click', () => window.Impressao.abrirOpcoes(opcoesRomaneio()));
 
   // ---------- Atalhos e início ----------
   document.addEventListener('keydown', (e) => {

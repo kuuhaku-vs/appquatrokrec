@@ -632,11 +632,12 @@
   });
 
   // Dados do relatório (PDF e PNG)
-  function dadosRelatorio() {
-    const rows = paraAjuste();
+  // situacoes: quais situações entram na tabela (padrão: tudo que precisa de ajuste)
+  function dadosRelatorio(situacoes) {
+    const rows = situacoes ? ultima.linhas.filter((l) => situacoes.includes(l.status)) : paraAjuste();
     const sis = window.romaneioAtual;
     const somaPL = itensPL.reduce((s, i) => s + (i.nw || 0), 0);
-    const divs = rows.filter((l) => l.status === 'divergente');
+    const divs = ultima.linhas.filter((l) => l.status === 'divergente'); // resumo sempre do total
     return {
       numero: sis.numero, quando: agoraTxt(),
       resumo: [
@@ -655,25 +656,40 @@
     };
   }
 
-  // Imprimir / salvar em PDF: relatório próprio para papel (A4 deitado), com a logo
-  $('confPdf').addEventListener('click', () => {
-    if (!ultima) return;
-    const d = dadosRelatorio();
+  // Imprimir / salvar em PDF: abre a janela de opções (com prévia) e imprime
+  function relatorioDivergencias(op) {
+    const d = dadosRelatorio(op.situacoes);
     const dest = (i) => i === 3 || i >= 6;
     const cls = (i) => [i >= 3 ? 'n' : '', i === 1 ? 'cod' : '', dest(i) ? 'dest' : ''].join(' ').trim();
-    window.Impressao.imprimir({
+    return {
       titulo: `Divergências do romaneio ${d.numero}`,
-      subtitulo: 'Conferência com packing list',
+      subtitulo: `Conferência com packing list · ${int(d.linhas.length)} ${d.linhas.length === 1 ? 'linha' : 'linhas'} no relatório`,
       resumo: d.resumo,
       corpo: `<table class="rel-tab rel-tab-div">
         <colgroup><col style="width:11%"><col style="width:12%"><col><col style="width:7%"><col style="width:10%"><col style="width:10%"><col style="width:10%"><col style="width:10%"></colgroup>
         <thead><tr>${d.cab.map((c, i) => `<th class="${cls(i)}">${esc(c)}</th>`).join('')}</tr></thead>
-        <tbody>${d.linhas.length ? d.linhas.map((l) => `<tr class="st-${l.cls}">${l.c.map((v, i) => `<td class="${cls(i)}">${i === 0 ? `<span class="rel-st">${esc(v)}</span>` : esc(v)}</td>`).join('')}</tr>`).join('') : '<tr><td colspan="8">Nenhuma divergência.</td></tr>'}</tbody>
+        <tbody>${d.linhas.length ? d.linhas.map((l) => `<tr class="st-${l.cls}">${l.c.map((v, i) => `<td class="${cls(i)}">${i === 0 ? `<span class="rel-st">${esc(v)}</span>` : esc(v)}</td>`).join('')}</tr>`).join('') : '<tr><td colspan="8">Nenhuma linha com as situações escolhidas.</td></tr>'}</tbody>
       </table>`,
       nota: 'Divergência = Peso na planilha − Peso no sistema. "Ajustar para" é o peso da planilha, para lançar no Protheus.',
       assinaturas: ['Conferido por', 'Ajustado no Protheus por', 'Data'],
-      paisagem: true,
       arquivo: nomeBase(),
+    };
+  }
+  $('confPdf').addEventListener('click', () => {
+    if (!ultima) return;
+    const cont = {};
+    ultima.linhas.forEach((l) => (cont[l.status] = (cont[l.status] || 0) + 1));
+    const ordemSt = ['divergente', 'so-sistema', 'so-planilha', 'sem-peso', 'ok'];
+    window.Impressao.abrirOpcoes({
+      chave: 'divergencias',
+      janela: `Imprimir divergências do romaneio ${window.romaneioAtual.numero}`,
+      tituloPadrao: `Divergências do romaneio ${window.romaneioAtual.numero}`,
+      paisagem: true,
+      campos: [
+        { id: 'situacoes', tipo: 'checks', rotulo: 'Situações na tabela', padrao: ordemSt.slice(0, 4),
+          opcoes: ordemSt.map((k) => [k, `${STATUS[k][0]} (${int(cont[k] || 0)})`]) },
+      ],
+      gerar: relatorioDivergencias,
     });
   });
 
